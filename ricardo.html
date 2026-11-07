@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="es"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel Ricardo · Sucursales</title>
+<style>
+:root{--brand:#E8823C;--dark:#C4661F;--cream:#FBF7F0;--ink:#2B241D;--soft:#6B5F52;--line:#E4D9C9;--red:#B23A2E;--ok:#3F7A4E;}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--cream);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;}
+header{background:var(--brand);color:#fff;padding:14px 18px;} header h1{margin:0;font-size:20px;} header small{opacity:.9}
+main{max-width:980px;margin:0 auto;padding:14px;}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;}
+.card h2{margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.05em;color:var(--dark);}
+textarea{width:100%;min-height:90px;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-family:ui-monospace,Menlo,monospace;font-size:12px;}
+input,select{padding:11px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;background:#fff;}
+button{padding:12px 16px;border:0;border-radius:10px;font-size:15px;font-weight:700;background:var(--brand);color:#fff;cursor:pointer;}
+button.g{background:#EFE7DB;color:var(--ink);} button.r{background:#fff;color:var(--red);border:1.5px solid var(--red);}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end;} .row>div{display:flex;flex-direction:column;gap:3px;} label{font-size:12px;font-weight:700;color:var(--soft);}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;}
+.suc{border-radius:12px;padding:10px 12px;border:1.5px solid var(--line);font-size:14px;} .suc b{display:block;font-size:16px;margin-bottom:2px;}
+.suc.si{background:#EEF6EF;border-color:var(--ok);} .suc.no{background:#FBE3E0;border-color:#E7A9A2;color:#8E2A20;}
+table{width:100%;border-collapse:collapse;font-size:13.5px;} th,td{border-bottom:1px solid var(--line);padding:6px 5px;text-align:left;vertical-align:top;} td.q{text-align:right;font-weight:800;} th{color:var(--soft);font-size:12px;}
+.m{color:var(--red);font-weight:800;} .p{color:var(--dark);font-weight:800;}
+.msg{margin-top:8px;font-size:14px;color:var(--ok);} .hint{font-size:12.5px;color:var(--soft);}
+</style></head><body>
+<header><h1>Panel de sucursales</h1><small>Stock, merma y Super Popi · todas las sucursales juntas</small></header>
+<main>
+ <div class="card" id="cardNube"><h2>☁️ Cierres recibidos</h2><div class="row"><button onclick="nube(true)">🔄 Actualizar</button><span id="nubeEstado" class="hint"></span></div></div>
+ <div class="card"><h2>Respaldo: pegar lo que te mandan por WhatsApp</h2>
+  <p class="hint">Cada vez que una sucursal te manda su cierre por WhatsApp, copiá el mensaje de texto (el que trae los códigos STOCK1: y REG1:) y pegalo acá. Con eso ves el stock del día y la merma / Super Popi. Podés pegar varios juntos. Si pegás dos veces el mismo, no se duplica.</p>
+  <textarea id="pega" placeholder="Pegá acá los mensajes..."></textarea>
+  <div class="row" style="margin-top:8px;"><button onclick="cargar()">⬇️ Cargar</button></div>
+  <div id="msg" class="msg"></div>
+ </div>
+
+ <div class="card"><h2>2 · Ver</h2>
+  <div class="row">
+   <div><label>Período</label><select id="modo"><option value="dia">Un día</option><option value="mes">Todo el mes</option></select></div>
+   <div id="wD"><label>Día</label><input type="date" id="dia"></div>
+   <div id="wM" style="display:none"><label>Mes</label><input type="month" id="mes"></div>
+   <div><label>Sucursal</label><select id="suc"></select></div>
+   <div><label>Ver</label><select id="tipo"><option value="todos">Merma y Super Popi</option><option value="merma">Solo merma</option><option value="popi">Solo Super Popi</option></select></div>
+  </div>
+ </div>
+
+ <div class="card"><h2>Quién mandó cierre</h2><div id="estado" class="grid"></div></div>
+ <div class="card"><h2>Stock del día por sucursal</h2><div id="stockDia"></div></div>
+ <div class="card"><h2>Totales por sucursal</h2><div id="porSuc"></div></div>
+ <div class="card"><h2>Totales por producto</h2><div id="porProd"></div></div>
+ <div class="card"><h2>Detalle</h2><div id="detalle"></div>
+  <div class="row" style="margin-top:10px;"><button class="g" onclick="copiar()">📋 Copiar</button><button class="g" onclick="csv()">⬇️ Excel (CSV)</button><button class="r" onclick="borrarTodo()">Borrar todo lo cargado</button></div>
+  <div id="msg2" class="msg"></div>
+ </div>
+</main>
+<script src="config.js"></script>
+<script>
+const SUCS=['Fuengirola','Miramar','Palo','Mayorazgo','Huelin','Teatinos','Marbella','Vialia','Granada','Nevada','Plaza Mayor','Almería','Carretería'];
+const SEC={porcion:'Porciones',tarrina:'Tarrinas',cookie:'Cookies',tartaPeq:'Tarta Pequeña',tartaMini:'Tarta Mini',otros:'Otros'};
+const KEY='panel_ricardo_v1';
+let datos=[]; try{ datos=JSON.parse(localStorage.getItem(KEY)||'[]'); }catch(e){}
+let stocks=[]; try{ stocks=JSON.parse(localStorage.getItem(KEY+'_stock')||'[]'); }catch(e){}
+function guardar(){ try{ localStorage.setItem(KEY,JSON.stringify(datos)); localStorage.setItem(KEY+'_stock',JSON.stringify(stocks)); }catch(e){} }
+const $=id=>document.getElementById(id);
+const p2=n=>String(n).padStart(2,'0');
+const d0=new Date(); const hoy=d0.getFullYear()+'-'+p2(d0.getMonth()+1)+'-'+p2(d0.getDate());
+$('dia').value=hoy; $('mes').value=hoy.slice(0,7);
+$('suc').innerHTML='<option value="todas">Todas</option>'+SUCS.map(s=>'<option>'+s+'</option>').join('');
+const fb=iso=>{const a=iso.split('-');return a[2]+'/'+a[1]+'/'+a[0];};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function cargar(txtIn, silent){
+  const txt=(typeof txtIn==='string')?txtIn:$('pega').value; let nStock=0;
+  const reS=/STOCK1:([A-Za-z0-9+\/=]+)/g; let ms;
+  while((ms=reS.exec(txt))){
+    try{
+      const o=JSON.parse(decodeURIComponent(escape(atob(ms[1])))); const me=o.meta||{};
+      const items=[]; const secMap={porcion:'porcion',tarrina:'tarrina',cookie:'cookie',tartaPeq:'tartaPeq',tartaMini:'tartaMini'};
+      Object.keys(secMap).forEach(s=>{ const st=(o.stock||{})[s]||{}; Object.keys(st).forEach(p=>{ if(st[p]) items.push({sec:s,prod:p,qty:st[p]}); }); });
+      const cn=o.customName||{}, sc=o.stockCustom||{};
+      Object.keys(sc).forEach(slot=>{ const nm=(cn[slot]||'').trim(); const q=sc[slot]&&sc[slot].qty; const s=slot.split('_')[0]; if(nm&&q) items.push({sec:SEC[s]?s:'porcion',prod:nm,qty:q}); });
+      const key=[me.local,me.fecha,me.turno,me.persona].join('|');
+      stocks=stocks.filter(x=>x.key!==key);
+      stocks.push({key,local:me.local,fecha:me.fecha,turno:me.turno,persona:me.persona,items}); nStock++;
+    }catch(e){}
+  }
+  const re=/REG1:([A-Za-z0-9+\/=]+)/g; let m, nuevos=0, repetidos=0, malos=0;
+  const have=new Set(datos.map(r=>r.key));
+  while((m=re.exec(txt))){
+    try{
+      const o=JSON.parse(decodeURIComponent(escape(atob(m[1]))));
+      (o.recs||[]).forEach(r=>{
+        const key=[o.local,o.fecha,o.turno,o.nombre,r.id].join('|');
+        if(have.has(key)){ repetidos++; return; }
+        have.add(key); nuevos++;
+        datos.push({key,local:o.local,fecha:o.fecha,turno:o.turno,nombre:o.nombre,tipo:r.tipo,sec:r.sec,prod:r.prod,qty:r.qty});
+      });
+    }catch(e){ malos++; }
+  }
+  guardar(); if(!silent) $('pega').value='';
+  if(silent){ return; }
+  $('msg').textContent='Cargado: '+(nStock?(nStock+' stock · '):'')+nuevos+' líneas de merma/popi nuevas'+(repetidos?(' · '+repetidos+' ya estaban'):'')+(malos?(' · '+malos+' códigos dañados (pedí que lo reenvíen)'):'');
+  if(!nuevos && !repetidos && !malos && !nStock) $('msg').textContent='No encontré ningún código (STOCK1: / REG1:) en lo que pegaste.';
+  if(nuevos||nStock){ const f=nuevos?datos[datos.length-1].fecha:stocks[stocks.length-1].fecha; $('modo').value='dia'; $('dia').value=f; }
+  render();
+}
+function filtrado(sinSuc){
+  const modo=$('modo').value, dia=$('dia').value, mes=$('mes').value, suc=$('suc').value, tipo=$('tipo').value;
+  return datos.filter(r=>(modo==='dia'?r.fecha===dia:r.fecha.slice(0,7)===mes)&&(sinSuc||suc==='todas'||r.local===suc)&&(tipo==='todos'||r.tipo===tipo));
+}
+function tabla(rows,cab){ return '<table><tr>'+cab.map(c=>'<th>'+c+'</th>').join('')+'</tr>'+rows.join('')+'</table>'; }
+function render(){
+  const modo=$('modo').value; $('wD').style.display=modo==='dia'?'':'none'; $('wM').style.display=modo==='mes'?'':'none';
+  // estado por sucursal (sin filtrar tipo/sucursal)
+  const modoD=$('modo').value, dia=$('dia').value, mes=$('mes').value;
+  const base=datos.filter(r=>modoD==='dia'?r.fecha===dia:r.fecha.slice(0,7)===mes);
+  $('estado').innerHTML=SUCS.map(s=>{
+    const l=base.filter(r=>r.local===s);
+    const sb=stocks.filter(x=>x.local===s&&(modoD==='dia'?x.fecha===dia:x.fecha.slice(0,7)===mes));
+    if(!l.length&&!sb.length) return '<div class="suc no"><b>'+s+'</b>Sin cierre</div>';
+    const quien=[...new Set(sb.map(x=>x.persona+' ('+x.turno+')').concat(l.map(r=>r.nombre+' ('+r.turno+')')))];
+    return '<div class="suc si"><b>'+s+' ✔</b>'+(sb.length?'Stock enviado<br>':'<span style="color:#8E2A20">Sin stock</span><br>')+esc(quien.join(', '))+'</div>';
+  }).join('');
+  // stock del día: último envío de cada sucursal (prioriza la Tarde)
+  (function(){
+    if(modoD!=='dia'){ $('stockDia').innerHTML='<p class="hint">Elegí "Un día" para ver el stock.</p>'; return; }
+    const sucSel=$('suc').value;
+    const ult={};
+    stocks.filter(x=>x.fecha===dia&&(sucSel==='todas'||x.local===sucSel)).forEach(x=>{ const c=ult[x.local]; if(!c||(x.turno==='Tarde'&&c.turno!=='Tarde')||(x.turno===c.turno)) ult[x.local]=x; });
+    const cols=SUCS.filter(s=>ult[s]);
+    if(!cols.length){ $('stockDia').innerHTML='<p class="hint">Todavía no hay stock cargado para este día.</p>'; return; }
+    const filas={};
+    cols.forEach(s=>ult[s].items.forEach(it=>{ const k=it.sec+'|'+it.prod; (filas[k]=filas[k]||{sec:it.sec,prod:it.prod,v:{}}).v[s]=it.qty; }));
+    const orden=['porcion','tarrina','cookie','tartaPeq','tartaMini'];
+    const ks=Object.keys(filas).sort((a,b)=>{const A=filas[a],B=filas[b];return orden.indexOf(A.sec)-orden.indexOf(B.sec)||A.prod.localeCompare(B.prod);});
+    let h='<div style="overflow-x:auto"><table><tr><th>Producto</th>'+cols.map(s=>'<th>'+esc(s)+'<div class="hint">'+esc(ult[s].turno)+'</div></th>').join('')+'</tr>';
+    let secAnt='';
+    ks.forEach(k=>{ const r=filas[k]; if(r.sec!==secAnt){ secAnt=r.sec; h+='<tr><td colspan="'+(cols.length+1)+'" style="background:#F3EBE4;font-weight:800;color:var(--dark)">'+esc(SEC[r.sec])+'</td></tr>'; }
+      h+='<tr><td>'+esc(r.prod)+'</td>'+cols.map(s=>'<td class="q">'+(r.v[s]!=null?r.v[s]:'–')+'</td>').join('')+'</tr>'; });
+    $('stockDia').innerHTML=h+'</table></div><p class="hint">Porciones y tartas: cantidad de porciones/unidades tal como figura en el stock que mandó cada sucursal (turno indicado debajo del nombre).</p>';
+  })();
+  const f=filtrado();
+  // por sucursal
+  const ps={}; f.forEach(r=>{ const o=ps[r.local]=ps[r.local]||{m:0,p:0}; if(r.tipo==='merma') o.m+=r.qty; else o.p+=r.qty; });
+  const ks=Object.keys(ps).sort();
+  $('porSuc').innerHTML=ks.length?tabla(ks.map(k=>'<tr><td>'+esc(k)+'</td><td class="q m">'+ps[k].m+'</td><td class="q p">'+ps[k].p+'</td></tr>'),['Sucursal','Merma','Super Popi']):'<p class="hint">Nada para mostrar.</p>';
+  // por producto
+  const pp={}; f.forEach(r=>{ const k=r.tipo+'|'+r.prod+'|'+(SEC[r.sec]||r.sec); pp[k]=(pp[k]||0)+r.qty; });
+  const pk=Object.keys(pp).sort();
+  $('porProd').innerHTML=pk.length?tabla(pk.map(k=>{const a=k.split('|');return '<tr><td><span class="'+(a[0]==='merma'?'m':'p')+'">'+(a[0]==='merma'?'MERMA':'POPI')+'</span> '+esc(a[1])+' <span class="hint">('+esc(a[2])+')</span></td><td class="q">'+pp[k]+'</td></tr>';}),['Producto','Cant.']):'<p class="hint">Nada para mostrar.</p>';
+  // detalle
+  const det=f.slice().sort((a,b)=>a.fecha<b.fecha?-1:a.fecha>b.fecha?1:(a.local<b.local?-1:1));
+  $('detalle').innerHTML=det.length?tabla(det.map(r=>'<tr><td>'+fb(r.fecha).slice(0,5)+'</td><td>'+esc(r.local)+'</td><td>'+esc(r.nombre)+'<div class="hint">'+esc(r.turno)+'</div></td><td><span class="'+(r.tipo==='merma'?'m':'p')+'">'+(r.tipo==='merma'?'MERMA':'POPI')+'</span> '+esc(r.prod)+'</td><td class="q">'+r.qty+'</td></tr>'),['Fecha','Sucursal','Empleado','Producto','Cant.']):'<p class="hint">Nada para mostrar.</p>';
+}
+['modo','dia','mes','suc','tipo'].forEach(i=>$(i).addEventListener('change',render));
+function texto(){ return filtrado().sort((a,b)=>a.fecha<b.fecha?-1:1).map(r=>fb(r.fecha)+' · '+r.local+' · '+r.nombre+' ('+r.turno+') · '+(r.tipo==='merma'?'MERMA':'SUPER POPI')+': '+r.qty+' '+r.prod+' ('+(SEC[r.sec]||r.sec)+')').join('\n'); }
+async function copiar(){ try{ await navigator.clipboard.writeText(texto()); $('msg2').textContent='Copiado.'; }catch(e){ prompt('Copiá:',texto()); } }
+function csv(){
+  const q=v=>'"'+String(v).replace(/"/g,'""')+'"';
+  let c='﻿Fecha;Sucursal;Empleado;Turno;Tipo;Seccion;Producto;Cantidad\n';
+  filtrado().forEach(r=>{ c+=[fb(r.fecha),r.local,r.nombre,r.turno,r.tipo==='merma'?'Merma':'Super Popi',SEC[r.sec]||r.sec,r.prod,r.qty].map(q).join(';')+'\n'; });
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([c],{type:'text/csv;charset=utf-8'})); a.download='registro_sucursales.csv'; a.click();
+}
+function borrarTodo(){ if(confirm('¿Borrar todo lo cargado en este panel? No se puede deshacer.')){ datos=[]; stocks=[]; guardar(); render(); $('msg').textContent='Borrado.'; } }
+render();
+
+const cache=new Set();
+function cfgN(){ const c=window.CFG; return (c&&c.tk)?{owner:c.owner,repo:c.repo,tk:[].concat(c.tk).join('')}:null; }
+async function ghGet(path, raw){
+  const c=cfgN(); const r=await fetch('https://api.github.com/repos/'+c.owner+'/'+c.repo+'/'+path,{headers:{'Authorization':'Bearer '+c.tk,'Accept':raw?'application/vnd.github.raw+json':'application/vnd.github+json'}});
+  if(r.status===404) return null; if(!r.ok) throw new Error('HTTP '+r.status);
+  return raw? await r.text() : await r.json();
+}
+let nubeBusy=false;
+async function nube(manual){
+  if(nubeBusy) return; const c=cfgN(); if(!c){ $('nubeEstado').textContent='Falta configurar config.js'; return; }
+  nubeBusy=true; $('nubeEstado').textContent='Buscando...';
+  try{
+    const modo=$('modo').value, dia=$('dia').value, mes=$('mes').value;
+    const mm=(modo==='dia'?dia:mes+'-01').slice(0,7);
+    const lista=await ghGet('contents/cierres/'+mm,false)||[];
+    const nombres=lista.filter(x=>x.name.endsWith('.json') && (modo==='mes'||x.name.startsWith(dia))).map(x=>x.name).filter(n=>!cache.has(mm+'/'+n));
+    let nuevos=0;
+    for(let i=0;i<nombres.length;i+=6){
+      await Promise.all(nombres.slice(i,i+6).map(async n=>{
+        try{
+          const txt=await ghGet('contents/cierres/'+mm+'/'+n,true); const o=JSON.parse(txt);
+          const b=x=>'REG1:'; 
+          let s=''; if(o.stock) s+='STOCK1:'+btoa(unescape(encodeURIComponent(JSON.stringify(o.stock))))+'\n';
+          if(o.reg) s+='REG1:'+btoa(unescape(encodeURIComponent(JSON.stringify(o.reg))))+'\n';
+          cargar(s,true); cache.add(mm+'/'+n); nuevos++;
+        }catch(e){}
+      }));
+    }
+    render();
+    $('nubeEstado').textContent='Actualizado '+new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})+(nuevos?(' · '+nuevos+' nuevos'):'');
+  }catch(e){ $('nubeEstado').textContent='No se pudo conectar ('+e.message+')'; }
+  nubeBusy=false;
+}
+['modo','dia','mes'].forEach(i=>$(i).addEventListener('change',()=>nube()));
+setInterval(()=>{ if(!document.hidden) nube(); }, 60000);
+
+// clave
+(function(){
+  const c=window.CFG||{}; if(!c.clave) { nube(); return; }
+  if(sessionStorage.getItem('rk_ok')==='1'){ nube(); return; }
+  const ov=document.createElement('div'); ov.style.cssText='position:fixed;inset:0;background:var(--cream);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  ov.innerHTML='<div class="card" style="max-width:340px;width:100%"><h2>Panel de sucursales</h2><input type="password" id="rk" placeholder="Clave" style="width:100%;margin-bottom:10px;"><button style="width:100%" id="rkb">Entrar</button><div id="rkm" class="hint"></div></div>';
+  document.body.appendChild(ov);
+  function ok(){ if(document.getElementById('rk').value===c.clave){ sessionStorage.setItem('rk_ok','1'); ov.remove(); nube(); } else document.getElementById('rkm').textContent='Clave incorrecta'; }
+  document.getElementById('rkb').onclick=ok; document.getElementById('rk').addEventListener('keydown',e=>{ if(e.key==='Enter') ok(); });
+})();
+</script></body></html>
