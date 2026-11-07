@@ -43,6 +43,7 @@ table{width:100%;border-collapse:collapse;font-size:13.5px;} th,td{border-bottom
  </div>
 
  <div class="card"><h2>Quién mandó cierre</h2><div id="estado" class="grid"></div></div>
+ <div class="card"><h2>📊 Estadísticas</h2><div id="estad"></div></div>
  <div class="card"><h2>Stock del día por sucursal</h2><div id="stockDia"></div></div>
  <div class="card"><h2>Totales por sucursal</h2><div id="porSuc"></div></div>
  <div class="card"><h2>Totales por producto</h2><div id="porProd"></div></div>
@@ -106,7 +107,7 @@ function filtrado(sinSuc){
   return datos.filter(r=>(modo==='dia'?r.fecha===dia:r.fecha.slice(0,7)===mes)&&(sinSuc||suc==='todas'||r.local===suc)&&(tipo==='todos'||r.tipo===tipo));
 }
 function tabla(rows,cab){ return '<table><tr>'+cab.map(c=>'<th>'+c+'</th>').join('')+'</tr>'+rows.join('')+'</table>'; }
-function render(){
+function render(){ try{ estad(); }catch(e){ console.error(e); }
   const modo=$('modo').value; $('wD').style.display=modo==='dia'?'':'none'; $('wM').style.display=modo==='mes'?'':'none';
   // estado por sucursal (sin filtrar tipo/sucursal)
   const modoD=$('modo').value, dia=$('dia').value, mes=$('mes').value;
@@ -159,6 +160,70 @@ function csv(){
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([c],{type:'text/csv;charset=utf-8'})); a.download='registro_sucursales.csv'; a.click();
 }
 function borrarTodo(){ if(confirm('¿Borrar todo lo cargado en este panel? No se puede deshacer.')){ datos=[]; stocks=[]; guardar(); render(); $('msg').textContent='Borrado.'; } }
+
+function estad(){
+  const modo=$('modo').value, dia=$('dia').value, mes=$('mes').value, sel=$('suc').value;
+  const inP=f=>modo==='dia'?f===dia:String(f).slice(0,7)===mes;
+  const kk=(s,p)=>s+'|'+p, nomP=k=>k.split('|')[1], catN=k=>{const c=k.split('|')[0];return SEC[c]||c;};
+  const uni=new Set(); stocks.forEach(x=>x.items.forEach(it=>uni.add(kk(it.sec,it.prod))));
+  const dd={}; stocks.forEach(x=>{ const L=dd[x.local]=dd[x.local]||{}; const c=L[x.fecha]; if(c&&c.t==='Tarde'&&x.turno!=='Tarde') return; const m={}; x.items.forEach(it=>{const k=kk(it.sec,it.prod); m[k]=(m[k]||0)+(Number(it.qty)||0);}); L[x.fecha]={t:x.turno,m}; });
+  const cur={}, dropL={}, dropP={};
+  SUCS.forEach(l=>{ const L=dd[l]; if(!L) return; const fs=Object.keys(L).sort(); const inFs=fs.filter(inP); if(!inFs.length) return;
+    const last=inFs[inFs.length-1]; cur[l]={f:last,t:L[last].t,m:L[last].m};
+    fs.forEach((f,i)=>{ if(i===0||!inP(f)) return; const a=L[fs[i-1]].m,b=L[f].m; let t=0;
+      uni.forEach(k=>{ const d=(a[k]||0)-(b[k]||0); if(d>0){ dropP[l]=dropP[l]||{}; dropP[l][k]=(dropP[l][k]||0)+d; t+=d; } });
+      dropL[l]=(dropL[l]||0)+t; }); });
+  const locs=(sel==='todas'?SUCS:[sel]).filter(l=>cur[l]);
+  const out=$('estad');
+  if(!locs.length){ out.innerHTML='<p class="hint">Todavía no hay stock cargado para este período'+(sel!=='todas'?' en '+esc(sel):'')+'. Tocá 🔄 Actualizar.</p>'; return; }
+  const sum=o=>Object.values(o).reduce((a,b)=>a+b,0);
+  const tot=l=>sum(cur[l].m);
+  const prodTot={}, catTot={}; uni.forEach(k=>{prodTot[k]=0;});
+  locs.forEach(l=>Object.keys(cur[l].m).forEach(k=>{ prodTot[k]=(prodTot[k]||0)+cur[l].m[k]; catTot[catN(k)]=(catTot[catN(k)]||0)+cur[l].m[k]; }));
+  const stockT=sum(catTot);
+  const mp=datos.filter(r=>inP(r.fecha)&&locs.includes(r.local));
+  const mermaT=mp.filter(r=>r.tipo==='merma').reduce((a,r)=>a+(Number(r.qty)||0),0), popiT=mp.filter(r=>r.tipo==='popi').reduce((a,r)=>a+(Number(r.qty)||0),0);
+  const dropT=locs.reduce((a,l)=>a+(dropL[l]||0),0); const dropProd={}; locs.forEach(l=>Object.keys(dropP[l]||{}).forEach(k=>{dropProd[k]=(dropProd[k]||0)+dropP[l][k];}));
+  const pc=(n,t)=>t?Math.round(n*1000/t)/10:0;
+  const bar=(w,c)=>'<div style="background:#EFE7DB;border-radius:6px;height:9px;min-width:60px"><div style="width:'+Math.max(2,Math.min(100,w))+'%;background:'+c+';height:9px;border-radius:6px"></div></div>';
+  const kpi=(t,v,sub,c)=>'<div class="suc" style="background:#fff"><span class="hint">'+t+'</span><b style="font-size:22px;color:'+(c||'var(--ink)')+'">'+v+'</b><span class="hint">'+sub+'</span></div>';
+  const lista=(arr,color,fmt)=>{ if(!arr.length) return '<p class="hint">Sin datos</p>'; const mx=Math.max(1,...arr.map(a=>a[1])); return '<table>'+arr.map(a=>'<tr><td style="width:42%">'+esc(nomP(a[0]))+' <span class="hint">'+esc(catN(a[0]))+'</span></td><td>'+bar(a[1]*100/mx,color)+'</td><td class="q" style="width:64px">'+(fmt?fmt(a[1]):a[1])+'</td></tr>').join('')+'</table>'; };
+  const sortD=(o)=>Object.entries(o).sort((a,b)=>b[1]-a[1]);
+  const pt=sortD(prodTot);
+  const mas=pt.filter(a=>a[1]>0).slice(0,5);
+  const menos=pt.slice().reverse().slice(0,5);
+  const hayDrop=dropT>0; const dp=sortD(dropProd);
+  const rot=dp.slice(0,5), rotMenos=pt.filter(a=>a[1]>0).map(a=>[a[0],dropProd[a[0]]||0]).sort((a,b)=>a[1]-b[1]).slice(0,5);
+  const mermaP={}, popiP={}; mp.forEach(r=>{ const o=r.tipo==='merma'?mermaP:popiP; const k=kk(r.sec,r.prod); o[k]=(o[k]||0)+(Number(r.qty)||0); });
+  let h='<div class="grid" style="margin-bottom:10px">'+
+    kpi('Locales con stock',locs.length+(sel==='todas'?' / '+SUCS.length:''),sel==='todas'?'enviaron cierre':'último cierre '+fb(cur[locs[0]].f))+
+    kpi('Unidades en stock',stockT,'suma de lo que quedó')+
+    kpi('Merma',mermaT,pc(mermaT,stockT+mermaT)+'% sobre stock + merma','var(--red)')+
+    kpi('Super Popi',popiT,'unidades retiradas','var(--dark)')+
+    (hayDrop?kpi('Salida estimada',dropT,'bajada de stock (mínimo)'):'')+'</div>';
+  h+='<h2 style="margin-top:6px">Stock por categoría</h2><table>'+Object.entries(catTot).sort((a,b)=>b[1]-a[1]).map(a=>'<tr><td style="width:30%">'+esc(a[0])+'</td><td>'+bar(pc(a[1],stockT),'var(--brand)')+'</td><td class="q" style="width:110px">'+a[1]+' · '+pc(a[1],stockT)+'%</td></tr>').join('')+'</table>';
+  h+='<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-top:12px"><div><h2>🔼 Más stock</h2>'+lista(mas,'var(--ok)')+'</div><div><h2>🔽 Menos stock / agotados</h2>'+lista(menos,'var(--red)')+'</div></div>';
+  if(hayDrop){
+    h+='<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-top:12px"><div><h2>🔥 Más salida (se vende más)</h2>'+lista(rot,'var(--dark)')+'</div><div><h2>🧊 Menos salida</h2>'+lista(rotMenos,'#8A7F72')+'</div></div><p class="hint">Salida estimada = cuánto bajó el stock de un cierre al siguiente. Es un mínimo: si ese día repusieron mercadería, la venta real fue mayor.</p>';
+  } else {
+    h+='<p class="hint" style="margin-top:10px">🔥 Más / menos salida: aparece cuando hay al menos 2 días de cierres. Elegí "Todo el mes".</p>';
+  }
+  h+='<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-top:12px"><div><h2>🗑️ Más merma</h2>'+lista(sortD(mermaP).slice(0,5),'var(--red)')+'</div><div><h2>⭐ Más Super Popi</h2>'+lista(sortD(popiP).slice(0,5),'var(--dark)')+'</div></div>';
+  if(sel==='todas'){
+    const filas=locs.slice().sort((a,b)=>tot(b)-tot(a)).map(l=>{
+      const m=cur[l].m, ks=Object.keys(m).sort((a,b)=>m[b]-m[a]); const ag=[...uni].filter(k=>!(m[k]>0));
+      const me=mp.filter(r=>r.local===l&&r.tipo==='merma').reduce((a,r)=>a+(Number(r.qty)||0),0), po=mp.filter(r=>r.local===l&&r.tipo==='popi').reduce((a,r)=>a+(Number(r.qty)||0),0);
+      return '<tr><td><b>'+esc(l)+'</b><div class="hint">'+esc(cur[l].t)+' · '+fb(cur[l].f).slice(0,5)+'</div></td><td class="q">'+tot(l)+'<div class="hint">'+pc(tot(l),stockT)+'%</div></td><td>'+(ks[0]?esc(nomP(ks[0]))+' <span class="hint">('+m[ks[0]]+')</span>':'–')+'</td><td>'+(ag.length?'<span class="m">'+ag.length+' sin stock</span><div class="hint">'+esc(ag.slice(0,3).map(nomP).join(', '))+(ag.length>3?'…':'')+'</div>':'<span style="color:var(--ok)">Todo con stock</span>')+'</td><td class="q m">'+me+'</td><td class="q p">'+po+'</td>'+(hayDrop?'<td class="q">'+(dropL[l]||0)+'</td>':'')+'</tr>';
+    }).join('');
+    const sinD=SUCS.filter(l=>!cur[l]);
+    h+='<h2 style="margin-top:14px">Por sucursal (ordenado por stock)</h2><div style="overflow-x:auto"><table><tr><th>Sucursal</th><th>Stock</th><th>Más stock</th><th>Falta</th><th>Merma</th><th>Popi</th>'+(hayDrop?'<th>Salida</th>':'')+'</tr>'+filas+'</table></div>'+(sinD.length?'<p class="hint">Sin datos: '+esc(sinD.join(', '))+'</p>':'')+'<p class="hint">Para ver el detalle de un local (más/menos stock, merma, salida), elegilo en "Sucursal" arriba.</p>';
+  } else {
+    const l=locs[0], m=cur[l].m, ag=[...uni].filter(k=>!(m[k]>0)); const prom=Object.keys(cur).length?Object.keys(cur).reduce((a,x)=>a+tot(x),0)/Object.keys(cur).length:0;
+    h+='<h2 style="margin-top:14px">Productos sin stock en '+esc(l)+'</h2>'+(ag.length?'<p>'+ag.map(k=>'<span class="m">'+esc(nomP(k))+'</span> <span class="hint">('+esc(catN(k))+')</span>').join(' · ')+'</p>':'<p class="hint">Todo con stock ✔</p>')+
+      '<p class="hint">Stock total del local: <b>'+tot(l)+'</b> unidades · promedio de los locales con datos: <b>'+Math.round(prom)+'</b> ('+(prom?(tot(l)>=prom?'+':'')+Math.round((tot(l)-prom)*100/prom)+'% vs promedio':'')+')</p>';
+  }
+  out.innerHTML=h;
+}
 render();
 
 const cache=new Set();
