@@ -55,7 +55,7 @@ table{width:100%;border-collapse:collapse;font-size:13.5px;} th,td{border-bottom
 <script src="config.js"></script>
 <script>
 const SUCS=['Almería','Carretería','Fuengirola','Granada','Huelin','Marbella','Mayorazgo','Miramar','Nevada','Palo','Plaza Mayor','Teatinos','Vialia'];
-const SEC={porcion:'Porciones',tarrina:'Tarrinas',cookie:'Cookies',tartaPeq:'Tarta Pequeña',tartaMini:'Tarta Mini',otros:'Otros'};
+const SEC={porcion:'Porciones',tarrina:'Tarrinas',cookie:'Cookies',tartaPeq:'Tarta Pequeña',tartaMini:'Tarta Mini',paneton:'Panetones',panetonP:'Panetones pequeños',roscon:'Roscones',rosconP:'Roscones pequeños',bebida:'Bebidas',otros:'Otros'};
 const KEY='panel_ricardo_v1';
 let datos=[]; try{ datos=JSON.parse(localStorage.getItem(KEY)||'[]'); }catch(e){}
 let stocks=[]; try{ stocks=JSON.parse(localStorage.getItem(KEY+'_stock')||'[]'); }catch(e){}
@@ -73,7 +73,7 @@ function cargar(txtIn, silent){
   while((ms=reS.exec(txt))){
     try{
       const o=JSON.parse(decodeURIComponent(escape(atob(ms[1])))); const me=o.meta||{};
-      const items=[]; const secMap={porcion:'porcion',tarrina:'tarrina',cookie:'cookie',tartaPeq:'tartaPeq',tartaMini:'tartaMini'};
+      const items=[]; const secMap={porcion:'porcion',tarrina:'tarrina',cookie:'cookie',tartaPeq:'tartaPeq',tartaMini:'tartaMini',paneton:'paneton',panetonP:'panetonP',roscon:'roscon',rosconP:'rosconP'};
       Object.keys(secMap).forEach(s=>{ const st=(o.stock||{})[s]||{}; Object.keys(st).forEach(p=>{ if(st[p]) items.push({sec:s,prod:p,qty:st[p]}); }); });
       const cn=o.customName||{}, sc=o.stockCustom||{};
       Object.keys(sc).forEach(slot=>{ const nm=(cn[slot]||'').trim(); const q=sc[slot]&&sc[slot].qty; const s=slot.split('_')[0]; if(nm&&q) items.push({sec:SEC[s]?s:'porcion',prod:nm,qty:q}); });

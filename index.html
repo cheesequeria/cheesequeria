@@ -13,7 +13,7 @@
   .popibtn{border-color:var(--orange)!important;color:var(--orange-dark)!important;}
   .mm-row.popi.on{background:#FFF1E4;border-color:var(--orange);color:var(--orange-dark);} .mm-row.popi.on button{background:var(--orange);}
   .meta-field input[type=text]{width:100%;padding:9px 8px;border-radius:9px;border:none;font-size:15px;font-weight:600;background:rgba(255,255,255,.95);color:var(--ink);}
-  .tab-btn[data-tab="ventas"],.tab-btn[data-tab="resultado"]{display:none!important;}
+  .tab-btn[data-tab="ventas"],.tab-btn[data-tab="resultado"],.tab-btn[data-tab="merma"]{display:none!important;} nav.tabs{display:none!important;}
 </style></head><body>
 <!DOCTYPE html>
 <html lang="es">
@@ -173,7 +173,7 @@
 <header class="top">
   <div class="header-top-row">
     <img class="app-logo" id="appLogo" alt="Cheesequeria">
-    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v3 · compra</span></h1>
+    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v5 · popi</span></h1>
   </div>
   <div class="meta-grid">
     <div class="meta-field" id="localField"><label>Local</label>
@@ -233,6 +233,22 @@
     <div class="card" style="background:#EAF1FD;">
       <h2>Tarta Luxury Mini</h2>
       <div class="rows" id="stockTartaMini"></div>
+    </div>
+    <div class="card" style="background:#FFF3E0;">
+      <h2>Panetones</h2>
+      <div class="rows" id="stockPaneton"></div>
+    </div>
+    <div class="card" style="background:#FFF3E0;">
+      <h2>Panetones pequeños</h2>
+      <div class="rows" id="stockPanetonP"></div>
+    </div>
+    <div class="card" style="background:#FDEBEB;">
+      <h2>Roscones</h2>
+      <div class="rows" id="stockRoscon"></div>
+    </div>
+    <div class="card" style="background:#FDEBEB;">
+      <h2>Roscones pequeños</h2>
+      <div class="rows" id="stockRosconP"></div>
     </div>
   </section>
 
@@ -370,13 +386,17 @@ const COOKIES = ["Dos chocolates","Negra chocolate blanco","Lotus","Pistacho","K
 const TARTA_PEQ = ["Payoya","Filipino","Tradicional","Pistacho","Chocobom blanco","Chocobom leche","Pistacho Gluten Free","Payoyo Gluten Free","Tradicional Gluten Free","Milkibar Gluten Free","Loca","Pionono","Lacasitos"];
 const TARTA_MINI = ["Payoya","Filipino","Tradicional","Pistacho","Chocobom blanco","Chocobom leche","Pistacho Gluten Free","Payoyo Gluten Free","Tradicional Gluten Free","Milkibar Gluten Free","Loca","Pionono","Lacasitos"];
 
+const PANETON = ["Chocolate blanco","Kinder","Lotus","Tres chocolates"];
+const ROSCON = ["Tradicional","Tradicional con nata","Pistacho","Lotus","Chocolate con avellana"];
+const BUCKETS = ['porcion','tarrina','cookie','tartaPeq','tartaMini','paneton','panetonP','roscon','rosconP'];
+function newBuckets(){ const o={}; BUCKETS.forEach(b=>{ o[b]={}; }); return o; }
 // live state
-const stock = { porcion:{}, tarrina:{}, cookie:{}, tartaPeq:{}, tartaMini:{} };
+const stock = newBuckets();
 // split real de porciones sueltas / tartas enteras (solo para la categoría
 // porcion — la app hace la cuenta sola: total = porciones + tartas*10)
 const stockRaw = { porcion:{} };
 // % PED cargado a mano por el usuario (positivo = pedir más, negativo = pedir menos)
-const pct = { porcion:{}, tarrina:{}, cookie:{}, tartaPeq:{}, tartaMini:{} };
+const pct = newBuckets();
 // slots de "sabor libre" por sección: 2 genéricos en cada una, y además un
 // tercer renglón fijo "Sabor del mes" en tarta pequeña y en mini
 const CUSTOM_SLOTS = {
@@ -385,6 +405,10 @@ const CUSTOM_SLOTS = {
   cookie:    ['cookie_1','cookie_2'],
   tartaPeq:  ['tartaPeq_1','tartaPeq_2','tartaPeq_mes'],
   tartaMini: ['tartaMini_1','tartaMini_2','tartaMini_mes'],
+  paneton:   ['paneton_1','paneton_2'],
+  panetonP:  ['panetonP_1','panetonP_2'],
+  roscon:    ['roscon_1','roscon_2'],
+  rosconP:   ['rosconP_1','rosconP_2'],
 };
 const customName = {};
 const stockCustom = {};
@@ -400,6 +424,8 @@ function initStock(){
   COOKIES.forEach(f=>{ stock.cookie[f]=0; pct.cookie[f]=0; });
   TARTA_PEQ.forEach(f=>{ stock.tartaPeq[f]=0; pct.tartaPeq[f]=0; });
   TARTA_MINI.forEach(f=>{ stock.tartaMini[f]=0; pct.tartaMini[f]=0; });
+  PANETON.forEach(f=>{ stock.paneton[f]=0; pct.paneton[f]=0; stock.panetonP[f]=0; pct.panetonP[f]=0; });
+  ROSCON.forEach(f=>{ stock.roscon[f]=0; pct.roscon[f]=0; stock.rosconP[f]=0; pct.rosconP[f]=0; });
 }
 initStock();
 
@@ -626,6 +652,10 @@ function buildStockUI(){
   CUSTOM_SLOTS.tartaMini.forEach(slot=>{
     const ph = slot.endsWith('_mes') ? 'Sabor del mes...' : '+ sabor nuevo...';
     buildCustomRow(document.getElementById('stockTartaMini'), slot, 'tartaMini', ph);
+  });
+  [['paneton','stockPaneton',PANETON],['panetonP','stockPanetonP',PANETON],['roscon','stockRoscon',ROSCON],['rosconP','stockRosconP',ROSCON]].forEach(([b,id,lst])=>{
+    lst.forEach(f=>buildRow(document.getElementById(id), f, stock[b], b));
+    CUSTOM_SLOTS[b].forEach(slot=>buildCustomRow(document.getElementById(id), slot, b, '+ sabor nuevo...'));
   });
 }
 buildStockUI();
@@ -913,7 +943,7 @@ function snapshotBeforeAlbaran(){
 
 function undoAlbaran(){
   if(!albaranUndoSnapshot){ alert('No hay ningún albarán reciente para deshacer.'); return; }
-  ['porcion','tarrina','cookie','tartaPeq','tartaMini'].forEach(b=>{
+  BUCKETS.forEach(b=>{
     Object.keys(stock[b]).forEach(f=>{ delete stock[b][f]; });
     Object.assign(stock[b], albaranUndoSnapshot.stock[b]);
   });
@@ -1016,7 +1046,7 @@ function saveDraft(){
   draftTimer = setTimeout(()=>{
     try{
       const toSave = { savedAt: Date.now() };
-      ['porcion','tarrina','cookie','tartaPeq','tartaMini'].forEach(bucket=>{
+      BUCKETS.forEach(bucket=>{
         toSave[bucket] = Object.assign({}, stock[bucket]);
       });
       toSave.pct = JSON.parse(JSON.stringify(pct));
@@ -1033,7 +1063,7 @@ function saveDraftNow(){
   clearTimeout(draftTimer);
   try{
     const toSave = { savedAt: Date.now() };
-    ['porcion','tarrina','cookie','tartaPeq','tartaMini'].forEach(bucket=>{ toSave[bucket] = Object.assign({}, stock[bucket]); });
+    BUCKETS.forEach(bucket=>{ toSave[bucket] = Object.assign({}, stock[bucket]); });
     toSave.pct = JSON.parse(JSON.stringify(pct));
     toSave.customName = Object.assign({}, customName);
     toSave.stockCustom = JSON.parse(JSON.stringify(stockCustom));
@@ -1079,7 +1109,7 @@ function loadSavedStock(){
     const draftRaw = localStorage.getItem(DRAFT_KEY);
     if(draftRaw){
       const draft = JSON.parse(draftRaw);
-      ['porcion','tarrina','cookie','tartaPeq','tartaMini'].forEach(bucket=>{
+      BUCKETS.forEach(bucket=>{
         if(draft[bucket]) Object.assign(stock[bucket], draft[bucket]);
       });
       if(draft.pct) Object.keys(draft.pct).forEach(bucket=>Object.assign(pct[bucket], draft.pct[bucket]));
@@ -1098,7 +1128,7 @@ function loadSavedStock(){
     const raw = localStorage.getItem(STORAGE_KEY);
     if(!raw) return;
     const saved = JSON.parse(raw);
-    ['porcion','tarrina','cookie','tartaPeq','tartaMini'].forEach(bucket=>{
+    BUCKETS.forEach(bucket=>{
       if(saved[bucket]) Object.assign(stock[bucket], saved[bucket]);
     });
     PORCION_GROUPS.flatMap(g=>g.items).forEach(f=>{ stockRaw.porcion[f] = deriveRawSplit(stock.porcion[f]||0); });
@@ -1172,8 +1202,8 @@ function copiarCodigoStock(fromDownload){
   // está cargado en pantalla.
   let stockToSend = stock, stockRawToSend = stockRaw;
   if(fromDownload && resultData){
-    stockToSend = { porcion:{}, tarrina:{}, cookie:{}, tartaPeq:{}, tartaMini:{} };
-    ['porcion','tarrina','cookie','tartaPeq','tartaMini'].forEach(bucket=>{
+    stockToSend = newBuckets();
+    BUCKETS.forEach(bucket=>{
       Object.keys(resultData[bucket]).forEach(f=>{ stockToSend[bucket][f] = resultData[bucket][f].final; });
     });
     stockRawToSend = { porcion:{} };
@@ -1229,7 +1259,7 @@ function cargarCodigoStock(){
 
     if(payload.stockRaw && payload.stockRaw.porcion) Object.assign(stockRaw.porcion, payload.stockRaw.porcion);
     if(payload.stock){
-      ['porcion','tarrina','cookie','tartaPeq','tartaMini'].forEach(b=>{
+      BUCKETS.forEach(b=>{
         if(payload.stock[b]) Object.assign(stock[b], payload.stock[b]);
       });
     }
@@ -1250,7 +1280,7 @@ function cargarCodigoStock(){
 
 function guardarStockAhora(){
   const toSave = { savedAt: Date.now() };
-  ['porcion','tarrina','cookie','tartaPeq','tartaMini'].forEach(bucket=>{
+  BUCKETS.forEach(bucket=>{
     toSave[bucket] = Object.assign({}, stock[bucket]);
   });
   if(!storageAvailable){
@@ -1269,7 +1299,7 @@ function guardarStockAhora(){
 function saveStockForTomorrow(){
   if(!resultData){ alert('Primero calculá el resultado en la pestaña 3.'); return; }
   const toSave = { savedAt: Date.now() };
-  ['porcion','tarrina','cookie','tartaPeq','tartaMini'].forEach(bucket=>{
+  BUCKETS.forEach(bucket=>{
     toSave[bucket] = {};
     Object.keys(resultData[bucket]).forEach(f=>{ toSave[bucket][f] = resultData[bucket][f].final; });
   });
@@ -1288,7 +1318,7 @@ function saveStockForTomorrow(){
 
 async function resetStock(){
   if(!(await uiConfirm('¿Seguro que querés dejar toda la planilla de stock en cero? Esto no se puede deshacer.'))) return;
-  ['porcion','tarrina','cookie','tartaPeq','tartaMini'].forEach(bucket=>{
+  BUCKETS.forEach(bucket=>{
     Object.keys(stock[bucket]).forEach(f=>{ stock[bucket][f] = 0; });
     Object.keys(pct[bucket]).forEach(f=>{ pct[bucket][f] = 0; });
   });
@@ -1494,7 +1524,7 @@ function parseSales(){
 
   const { pairs, formatUsed } = extractPairs(text);
 
-  const parsed = { porcion:{}, tarrina:{}, cookie:{}, tartaPeq:{}, tartaMini:{} };
+  const parsed = newBuckets();
   const unmatched = [];
   const matchedRows = [];
   let skippedOtherStore = 0;
@@ -1574,14 +1604,14 @@ function calcularResultado(){
     alert('Primero cargá las ventas en la pestaña 2.');
     return;
   }
-  const totalSold = ['porcion','tarrina','cookie','tartaPeq','tartaMini']
+  const totalSold = BUCKETS
     .reduce((acc,b)=>acc + Object.keys(salesParsed[b]).length, 0);
   if(totalSold===0){
     statusEl.innerHTML = '<div class="banner error">⚠ Las ventas que cargué no tienen ninguna línea reconocida, así que no hay nada para descontar. Revisá el texto pegado en la pestaña 2.</div>';
   } else {
     statusEl.innerHTML = `<div class="banner ok">✔ Calculado con ${totalSold} sabor(es)/producto(s) descontado(s).</div>`;
   }
-  const out = { porcion:{}, tarrina:{}, cookie:{}, tartaPeq:{}, tartaMini:{} };
+  const out = newBuckets();
 
   function applyBucket(bucketName, storeObj, keys){
     keys.forEach(f=>{
@@ -1595,6 +1625,7 @@ function calcularResultado(){
   applyBucket('cookie', stock.cookie, COOKIES);
   applyBucket('tartaPeq', stock.tartaPeq, TARTA_PEQ);
   applyBucket('tartaMini', stock.tartaMini, TARTA_MINI);
+  applyBucket('paneton', stock.paneton, PANETON); applyBucket('panetonP', stock.panetonP, PANETON); applyBucket('roscon', stock.roscon, ROSCON); applyBucket('rosconP', stock.rosconP, ROSCON);
 
   // sabor libre por sección (no se descuenta contra ventas automáticamente,
   // es una anotación manual: la persona pone directamente lo que le queda)
@@ -1653,6 +1684,7 @@ function renderResult(){
   section('COOKIES','cookie', COOKIES, true);
   section('TARTA LUXURY PEQUEÑA','tartaPeq', TARTA_PEQ, true);
   section('TARTA LUXURY MINI','tartaMini', TARTA_MINI, true);
+  section('PANETONES','paneton', PANETON, true); section('PANETONES PEQUEÑOS','panetonP', PANETON, true); section('ROSCONES','roscon', ROSCON, true); section('ROSCONES PEQUEÑOS','rosconP', ROSCON, true);
 
   box.innerHTML = html;
 }
@@ -1684,6 +1716,7 @@ function copiarResumen(){
   sec('COOKIES','cookie',COOKIES);
   sec('TARTA LUXURY PEQUEÑA','tartaPeq',TARTA_PEQ);
   sec('TARTA LUXURY MINI','tartaMini',TARTA_MINI);
+  sec('PANETONES','paneton',PANETON); sec('PANETONES PEQUEÑOS','panetonP',PANETON); sec('ROSCONES','roscon',ROSCON); sec('ROSCONES PEQUEÑOS','rosconP',ROSCON);
 
   navigator.clipboard.writeText(txt).then(()=>{
     alert('Resumen copiado. Pegalo donde quieras (WhatsApp, notas, etc.)');
@@ -1698,7 +1731,7 @@ function copiarResumen(){
 function buildRawResultData(){
   // snapshot directo del stock cargado, sin ventas descontadas todavía
   // (para el conteo de las 16:30, por ejemplo)
-  const out = { porcion:{}, tarrina:{}, cookie:{}, tartaPeq:{}, tartaMini:{} };
+  const out = newBuckets();
   function fill(bucket, keys){
     keys.forEach(f=>{
       const v = stock[bucket][f] || 0;
@@ -1710,6 +1743,7 @@ function buildRawResultData(){
   fill('cookie', COOKIES);
   fill('tartaPeq', TARTA_PEQ);
   fill('tartaMini', TARTA_MINI);
+  fill('paneton', PANETON); fill('panetonP', PANETON); fill('roscon', ROSCON); fill('rosconP', ROSCON);
 
   out.custom = {};
   Object.keys(CUSTOM_SLOTS).forEach(bucket=>{
@@ -2079,8 +2113,16 @@ function descargarFicha(){
   const tmModels = TARTA_MINI.filter(f=>f!=='Lacasitos').map(f=>({name:f, ...(data.tartaMini[f]||{orig:0,sold:0,final:0})}));
   const tmLac = data.tartaMini['Lacasitos']||{orig:0,sold:0,final:0};
   y = box(y, 'TARTA LUXURY MINI', 'tartaMini', tmModels, tmLac);
+  // panetones y roscones: van abajo de la columna izquierda (que queda libre)
+  let yl = leftBottom + 40;
+  [['PANETONES','paneton',PANETON],['PANETONES PEQUEÑOS','panetonP',PANETON],['ROSCONES','roscon',ROSCON],['ROSCONES PEQUEÑOS','rosconP',ROSCON]].forEach(([t,b,lst])=>{
+    ctx.save(); ctx.translate(LX0-RX0, 0);
+    yl = smallTable(yl, t, b, lst.map(f=>({name:f, ...(data[b][f]||{orig:0,sold:0,final:0})})));
+    ctx.restore();
+    yl += 30;
+  });
 
-  const finalH = Math.ceil(Math.max(leftBottom, y)+30);
+  const finalH = Math.ceil(Math.max(leftBottom, y, yl)+30);
   const trimmed = document.createElement('canvas');
   trimmed.width = W; trimmed.height = finalH;
   const tctx = trimmed.getContext('2d');
@@ -2126,9 +2168,14 @@ const MERMA_SECCIONES = {
   cookie:{titulo:'Cookies', unidad:'cookies'},
   tartaPeq:{titulo:'Tarta Luxury Pequeña', unidad:'tartas'},
   tartaMini:{titulo:'Tarta Luxury Mini', unidad:'tartas'},
+  paneton:{titulo:'Panetones', unidad:'panetones'},
+  panetonP:{titulo:'Panetones pequeños', unidad:'panetones'},
+  roscon:{titulo:'Roscones', unidad:'roscones'},
+  rosconP:{titulo:'Roscones pequeños', unidad:'roscones'},
+  bebida:{titulo:'Bebidas', unidad:'bebidas'},
   otros:{titulo:'Merienda / otros', unidad:'unidades'},
 };
-const POPI_OTROS = ['Merienda'];
+const POPI_OTROS = ['Merienda','Merienda 2x1'];
 const TIPO_TXT = {merma:'MERMA', popi:'SUPER POPI', compra:'COMPRÓ'};
 let mermaMem = [];
 function mermaLeer(){
@@ -2147,6 +2194,9 @@ function mermaSabores(bucket, tipo){
   else if(bucket==='cookie') base = COOKIES.slice();
   else if(bucket==='tartaPeq') base = TARTA_PEQ.slice();
   else if(bucket==='tartaMini') base = TARTA_MINI.slice();
+  else if(bucket==='paneton'||bucket==='panetonP') base = PANETON.slice();
+  else if(bucket==='roscon'||bucket==='rosconP') base = ROSCON.slice();
+  else if(bucket==='bebida') base = tipo==='popi' ? ['Latte','Ice latte','Ice matcha'] : [];
   else if(bucket==='otros') base = tipo==='popi' ? POPI_OTROS.slice() : [];
   (CUSTOM_SLOTS[bucket]||[]).forEach(s=>{ const n=(customName[s]||'').trim(); if(n && !base.includes(n)) base.push(n); });
   return base;
@@ -2166,8 +2216,13 @@ function abrirMerma(bucket, tipo){
   if(!(document.getElementById('metaPersona').value||'').trim()){
     alert('Primero escribí tu nombre arriba (casilla "Nombre").'); return;
   }
-  const sec = MERMA_SECCIONES[bucket];
-  const sabores = mermaSabores(bucket, tipo);
+  const multi = !esMerma;
+  const sec = multi ? {titulo:'', unidad:'unidades'} : MERMA_SECCIONES[bucket];
+  const POPI_GRUPOS = [['porcion','2x1 de porción de tarta'],['cookie','2x1 de cookies'],['tartaPeq','2x1 de tarta pequeña'],['tartaMini','2x1 de tarta mini'],['tarrina','2x1 de tarrinas'],['bebida','2x1 de bebidas'],['otros',null]];
+  const sabores = [];
+  if(multi){ POPI_GRUPOS.forEach(([b,x])=>{ const l=mermaSabores(b,'popi').slice(); if(x) l.push(x); l.forEach(n=>sabores.push(b+'|'+n)); }); }
+  else mermaSabores(bucket,tipo).forEach(n=>sabores.push(bucket+'|'+n));
+  const lbl = k=>k.slice(k.indexOf('|')+1);
   const qty = {}; sabores.forEach(s=>qty[s]=0);
   const old = document.getElementById('mermaOverlay'); if(old) old.remove();
   const ov = document.createElement('div');
@@ -2175,11 +2230,11 @@ function abrirMerma(bucket, tipo){
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99998;overflow:auto;padding:10px;';
   const box = document.createElement('div');
   box.style.cssText='background:#fff;border-radius:14px;max-width:560px;margin:0 auto;padding:14px;';
-  box.innerHTML = '<h3 style="margin:0 0 4px;color:'+color+';">'+(esMerma?'🗑️ Merma':'⭐ Super Popi')+' · '+sec.titulo+'</h3>'
+  box.innerHTML = '<h3 style="margin:0 0 4px;color:'+color+';">'+(esMerma?'🗑️ Merma':'⭐ Super Popi')+(multi?'':' · '+sec.titulo)+'</h3>'
     + '<p class="hint" style="margin:0 0 8px;">Tocá <b>+</b> en '+(esMerma?'lo que se tiró (queda en rojo)':'lo que te llevaste')+'. Cantidad en <b>'+sec.unidad+'</b>.</p>'
     + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;"><label style="font-weight:700;">Fecha:</label><input type="date" id="mmFecha" value="'+hoyISO()+'" style="flex:1;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-size:16px;"></div>'
     + '<div id="mmLista"></div>'
-    + (bucket==='otros' ? '<div style="display:flex;gap:6px;margin:6px 0;"><input id="mmOtro" placeholder="Otro producto (escribir)" style="flex:1;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;"><button id="mmOtroB" type="button" style="padding:0 16px;border:0;border-radius:10px;background:#2B241D;color:#fff;font-weight:800;">Agregar</button></div>' : '')
+    + ((multi||bucket==='otros') ? '<div style="display:flex;gap:6px;margin:6px 0;"><input id="mmOtro" placeholder="Otro producto (escribir)" style="flex:1;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;"><button id="mmOtroB" type="button" style="padding:0 16px;border:0;border-radius:10px;background:#2B241D;color:#fff;font-weight:800;">Agregar</button></div>' : '')
     + (esMerma ? '' : '<div style="margin:10px 0 6px;padding:10px;border:1.5px dashed '+color+';border-radius:12px;"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><b style="flex:1;min-width:130px;">🛒 ¿Compró algo?</b><button type="button" id="mmCNo" style="padding:10px 18px;border:0;border-radius:10px;font-size:15px;font-weight:800;background:#2B241D;color:#fff;">No</button><button type="button" id="mmCSi" style="padding:10px 18px;border:0;border-radius:10px;font-size:15px;font-weight:800;background:#ddd;color:#2B241D;">Sí</button></div><div id="mmCBox" style="display:none;margin-top:8px;"><p class="hint" style="margin:0 0 6px;">Tocá <b>+</b> en lo que <b>compró</b> (pagó).</p><div id="mmCLista"></div><div style="display:flex;gap:6px;margin:6px 0 0;"><input id="mmCOtro" placeholder="Otro producto comprado (escribir)" style="flex:1;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;"><button id="mmCOtroB" type="button" style="padding:0 16px;border:0;border-radius:10px;background:#2B241D;color:#fff;font-weight:800;">+</button></div></div></div>')
     + '<input id="mmNota" placeholder="Nota (opcional)'+(esMerma?': vencida, se cayó, rota...':'')+'" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;margin:6px 0 10px;box-sizing:border-box;">'
     + '<div style="display:flex;gap:8px;"><button id="mmCancel" style="flex:1;padding:14px;border:0;border-radius:12px;background:#ddd;font-size:16px;font-weight:700;">Cancelar</button><button id="mmSave" style="flex:2;padding:14px;border:0;border-radius:12px;background:'+color+';color:#fff;font-size:16px;font-weight:800;">Guardar '+(esMerma?'merma':'Super Popi')+'</button></div>';
@@ -2188,7 +2243,7 @@ function abrirMerma(bucket, tipo){
   function fila(s){
     const r = document.createElement('div'); r.className='mm-row'+(esMerma?'':' popi');
     r.innerHTML='<div class="mm-n"></div><button type="button" class="mm-minus">−</button><div class="mm-q">0</div><button type="button" class="mm-plus">+</button>';
-    r.querySelector('.mm-n').textContent = s;
+    r.dataset.k = s; r.querySelector('.mm-n').textContent = lbl(s);
     const q = r.querySelector('.mm-q');
     const upd = ()=>{ q.textContent = qty[s]; r.classList.toggle('on', qty[s]>0); };
     r.querySelector('.mm-plus').onclick = ()=>{ qty[s]++; upd(); };
@@ -2196,13 +2251,13 @@ function abrirMerma(bucket, tipo){
     r.querySelector('.mm-n').onclick = ()=>{ if(qty[s]===0){ qty[s]=1; upd(); } };
     lista.appendChild(r); upd();
   }
-  sabores.forEach(fila);
-  if(bucket==='otros'){
+  { let gAnt=null; sabores.forEach(k=>{ const g=k.split('|')[0]; if(multi && g!==gAnt){ gAnt=g; const h=document.createElement('div'); h.style.cssText='font-weight:800;font-size:13px;color:#6B5F52;margin:10px 0 4px;text-transform:uppercase;'; h.textContent=MERMA_SECCIONES[g].titulo; lista.appendChild(h); } fila(k); }); }
+  if(multi||bucket==='otros'){
     box.querySelector('#mmOtroB').onclick = ()=>{
-      const n = box.querySelector('#mmOtro').value.trim(); if(!n) return;
+      const n0 = box.querySelector('#mmOtro').value.trim(); if(!n0) return; const n='otros|'+n0;
       if(!(n in qty)){ sabores.push(n); qty[n]=0; fila(n); }
       qty[n]++;
-      [...lista.children].forEach(ch=>{ if(ch.querySelector('.mm-n').textContent===n){ ch.querySelector('.mm-q').textContent=qty[n]; ch.classList.add('on'); } });
+      [...lista.children].forEach(ch=>{ if(ch.dataset && ch.dataset.k===n){ ch.querySelector('.mm-q').textContent=qty[n]; ch.classList.add('on'); } });
       box.querySelector('#mmOtro').value='';
     };
   }
@@ -2210,7 +2265,7 @@ function abrirMerma(bucket, tipo){
   let compraSi = false; const cq = {}; const cItems = [];
   if(!esMerma){
     const cl = box.querySelector('#mmCLista');
-    const grupos = ['porcion','tarrina','cookie','tartaPeq','tartaMini','otros'];
+    const grupos = BUCKETS.concat(['bebida','otros']);
     const filaC = (b,sab)=>{
       const key = b+'|'+sab; if(!(key in cq)){ cq[key]=0; cItems.push({key,b,sab}); }
       const r = document.createElement('div'); r.className='mm-row'; r.dataset.k=key; r.style.setProperty('--x','1');
@@ -2250,13 +2305,13 @@ function abrirMerma(bucket, tipo){
     const local = document.getElementById('metaLocal').value;
     const turno = document.getElementById('metaTurno').value;
     const persona = (document.getElementById('metaPersona').value||'').trim();
-    const nuevos = items.map(s=>({id:Date.now()+'_'+Math.random().toString(36).slice(2,6), tipo, fecha, local, turno, bucket, sabor:s, qty:qty[s], unidad:sec.unidad, nota, persona, compro:(!esMerma&&compras.length)?1:0}));
+    const nuevos = items.map(k=>{ const b=k.split('|')[0], sab=lbl(k); return {id:Date.now()+'_'+Math.random().toString(36).slice(2,6), tipo, fecha, local, turno, bucket:b, sabor:sab, qty:qty[k], unidad:/2x1/i.test(sab)?'2x1':MERMA_SECCIONES[b].unidad, nota, persona, compro:(!esMerma&&compras.length)?1:0}; });
     compras.forEach(c=>nuevos.push({id:Date.now()+'_'+Math.random().toString(36).slice(2,6), tipo:'compra', fecha, local, turno, bucket:c.b, sabor:c.sab, qty:cq[c.key], unidad:MERMA_SECCIONES[c.b].unidad, nota:'', persona, compro:0}));
     mermaGuardar(mermaLeer().concat(nuevos));
     ov.remove();
     mermaPintarRojo();
     mermaRender();
-    alert((esMerma?'Merma':'Super Popi')+' guardado: '+items.map(s=>qty[s]+' '+s).join(', ')+(compras.length?' · Compró: '+compras.map(c=>cq[c.key]+' '+c.sab).join(', '):'')+' ('+fechaBonita(fecha)+').');
+    alert((esMerma?'Merma':'Super Popi')+' guardado: '+items.map(k=>qty[k]+' '+lbl(k)).join(', ')+(compras.length?' · Compró: '+compras.map(c=>cq[c.key]+' '+c.sab).join(', '):'')+' ('+fechaBonita(fecha)+').');
   };
 }
 
@@ -2266,7 +2321,7 @@ function mermaPintarRojo(){
   const arr = mermaLeer().filter(m=>m.fecha===hoy);
   const mapa = {};
   arr.forEach(m=>{ const k=tipoDe(m)+'|'+m.bucket+'|'+m.sabor; mapa[k]=(mapa[k]||0)+m.qty; });
-  const ids = {porcion:'stockGroups', tarrina:'stockTarrinas', cookie:'stockCookies', tartaPeq:'stockTartaPeq', tartaMini:'stockTartaMini'};
+  const ids = {porcion:'stockGroups', tarrina:'stockTarrinas', cookie:'stockCookies', tartaPeq:'stockTartaPeq', tartaMini:'stockTartaMini', paneton:'stockPaneton', panetonP:'stockPanetonP', roscon:'stockRoscon', rosconP:'stockRosconP'};
   Object.keys(ids).forEach(b=>{
     const cont = document.getElementById(ids[b]); if(!cont) return;
     cont.querySelectorAll('.row').forEach(row=>{
@@ -2422,6 +2477,10 @@ function regCodigo(){
     cookie:document.getElementById('stockCookies'),
     tartaPeq:document.getElementById('stockTartaPeq'),
     tartaMini:document.getElementById('stockTartaMini'),
+    paneton:document.getElementById('stockPaneton'),
+    panetonP:document.getElementById('stockPanetonP'),
+    roscon:document.getElementById('stockRoscon'),
+    rosconP:document.getElementById('stockRosconP'),
   };
   Object.keys(anchors).forEach(b=>{
     const wrap = document.createElement('div'); wrap.className='mmbtns';
@@ -2433,8 +2492,8 @@ function regCodigo(){
     anchors[b].parentNode.insertBefore(wrap, anchors[b]);
   });
   // Merienda y otros (solo Super Popi) al final del stock
-  const last = document.getElementById('stockTartaMini').parentNode;
-  const card = document.createElement('div'); card.className='card';
+  const last = document.getElementById('stockRosconP').parentNode;
+  const card = document.createElement('div'); card.className='card'; card.style.display='none';
   card.innerHTML='<button type="button" class="mermabtn popibtn" style="margin:0;" id="popiOtros">⭐ Super Popi · Merienda y otros</button>';
   last.parentNode.insertBefore(card, last.nextSibling);
   card.querySelector('#popiOtros').onclick=()=>abrirMerma('otros','popi');
