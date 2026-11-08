@@ -19,7 +19,7 @@ button.g{background:#EFE7DB;color:var(--ink);} button.r{background:#fff;color:va
 .suc{border-radius:12px;padding:10px 12px;border:1.5px solid var(--line);font-size:14px;} .suc b{display:block;font-size:16px;margin-bottom:2px;}
 .suc.si{background:#EEF6EF;border-color:var(--ok);} .suc.no{background:#FBE3E0;border-color:#E7A9A2;color:#8E2A20;}
 table{width:100%;border-collapse:collapse;font-size:13.5px;} th,td{border-bottom:1px solid var(--line);padding:6px 5px;text-align:left;vertical-align:top;} td.q{text-align:right;font-weight:800;} th{color:var(--soft);font-size:12px;}
-.m{color:var(--red);font-weight:800;} .p{color:var(--dark);font-weight:800;}
+.m{color:var(--red);font-weight:800;} .ok{color:var(--ok);font-weight:800;} .p{color:var(--dark);font-weight:800;}
 .msg{margin-top:8px;font-size:14px;color:var(--ok);} .hint{font-size:12.5px;color:var(--soft);}
 </style></head><body>
 <header><h1>Panel de sucursales</h1><small>Stock, merma y Super Popi · todas las sucursales juntas</small></header>
@@ -38,7 +38,7 @@ table{width:100%;border-collapse:collapse;font-size:13.5px;} th,td{border-bottom
    <div id="wD"><label>Día</label><input type="date" id="dia"></div>
    <div id="wM" style="display:none"><label>Mes</label><input type="month" id="mes"></div>
    <div><label>Sucursal</label><select id="suc"></select></div>
-   <div><label>Ver</label><select id="tipo"><option value="todos">Merma y Super Popi</option><option value="merma">Solo merma</option><option value="popi">Solo Super Popi</option></select></div>
+   <div><label>Ver</label><select id="tipo"><option value="todos">Merma y Super Popi</option><option value="merma">Solo merma</option><option value="popi">Solo Super Popi</option><option value="compra">Solo compras (con Super Popi)</option></select></div>
   </div>
  </div>
 
@@ -54,7 +54,7 @@ table{width:100%;border-collapse:collapse;font-size:13.5px;} th,td{border-bottom
 </main>
 <script src="config.js"></script>
 <script>
-const SUCS=['Fuengirola','Miramar','Palo','Mayorazgo','Huelin','Teatinos','Marbella','Vialia','Granada','Nevada','Plaza Mayor','Almería','Carretería'];
+const SUCS=['Almería','Carretería','Fuengirola','Granada','Huelin','Marbella','Mayorazgo','Miramar','Nevada','Palo','Plaza Mayor','Teatinos','Vialia'];
 const SEC={porcion:'Porciones',tarrina:'Tarrinas',cookie:'Cookies',tartaPeq:'Tarta Pequeña',tartaMini:'Tarta Mini',otros:'Otros'};
 const KEY='panel_ricardo_v1';
 let datos=[]; try{ datos=JSON.parse(localStorage.getItem(KEY)||'[]'); }catch(e){}
@@ -91,7 +91,7 @@ function cargar(txtIn, silent){
         const key=[o.local,o.fecha,o.turno,o.nombre,r.id].join('|');
         if(have.has(key)){ repetidos++; return; }
         have.add(key); nuevos++;
-        datos.push({key,local:o.local,fecha:o.fecha,turno:o.turno,nombre:o.nombre,tipo:r.tipo,sec:r.sec,prod:r.prod,qty:r.qty});
+        datos.push({key,local:o.local,fecha:o.fecha,turno:o.turno,nombre:o.nombre,tipo:r.tipo,sec:r.sec,prod:r.prod,qty:r.qty,c:r.c?1:0});
       });
     }catch(e){ malos++; }
   }
@@ -107,6 +107,7 @@ function filtrado(sinSuc){
   return datos.filter(r=>(modo==='dia'?r.fecha===dia:r.fecha.slice(0,7)===mes)&&(sinSuc||suc==='todas'||r.local===suc)&&(tipo==='todos'||r.tipo===tipo));
 }
 function tabla(rows,cab){ return '<table><tr>'+cab.map(c=>'<th>'+c+'</th>').join('')+'</tr>'+rows.join('')+'</table>'; }
+function TL(t,l){ return t==='merma'?'MERMA':(t==='compra'?'COMPRÓ':(l?'SUPER POPI':'POPI')); }
 function render(){ try{ estad(); }catch(e){ console.error(e); }
   const modo=$('modo').value; $('wD').style.display=modo==='dia'?'':'none'; $('wM').style.display=modo==='mes'?'':'none';
   // estado por sucursal (sin filtrar tipo/sucursal)
@@ -139,24 +140,24 @@ function render(){ try{ estad(); }catch(e){ console.error(e); }
   })();
   const f=filtrado();
   // por sucursal
-  const ps={}; f.forEach(r=>{ const o=ps[r.local]=ps[r.local]||{m:0,p:0}; if(r.tipo==='merma') o.m+=r.qty; else o.p+=r.qty; });
+  const ps={}; f.forEach(r=>{ const o=ps[r.local]=ps[r.local]||{m:0,p:0,c:0}; if(r.tipo==='merma') o.m+=r.qty; else if(r.tipo==='compra') o.c+=r.qty; else o.p+=r.qty; });
   const ks=Object.keys(ps).sort();
-  $('porSuc').innerHTML=ks.length?tabla(ks.map(k=>'<tr><td>'+esc(k)+'</td><td class="q m">'+ps[k].m+'</td><td class="q p">'+ps[k].p+'</td></tr>'),['Sucursal','Merma','Super Popi']):'<p class="hint">Nada para mostrar.</p>';
+  $('porSuc').innerHTML=ks.length?tabla(ks.map(k=>'<tr><td>'+esc(k)+'</td><td class="q m">'+ps[k].m+'</td><td class="q p">'+ps[k].p+'</td><td class="q" style="color:var(--ok);font-weight:800">'+ps[k].c+'</td></tr>'),['Sucursal','Merma','Super Popi','Compras']):'<p class="hint">Nada para mostrar.</p>';
   // por producto
   const pp={}; f.forEach(r=>{ const k=r.tipo+'|'+r.prod+'|'+(SEC[r.sec]||r.sec); pp[k]=(pp[k]||0)+r.qty; });
   const pk=Object.keys(pp).sort();
-  $('porProd').innerHTML=pk.length?tabla(pk.map(k=>{const a=k.split('|');return '<tr><td><span class="'+(a[0]==='merma'?'m':'p')+'">'+(a[0]==='merma'?'MERMA':'POPI')+'</span> '+esc(a[1])+' <span class="hint">('+esc(a[2])+')</span></td><td class="q">'+pp[k]+'</td></tr>';}),['Producto','Cant.']):'<p class="hint">Nada para mostrar.</p>';
+  $('porProd').innerHTML=pk.length?tabla(pk.map(k=>{const a=k.split('|');return '<tr><td><span class="'+(a[0]==='merma'?'m':(a[0]==='compra'?'ok':'p'))+'">'+TL(a[0])+'</span> '+esc(a[1])+' <span class="hint">('+esc(a[2])+')</span></td><td class="q">'+pp[k]+'</td></tr>';}),['Producto','Cant.']):'<p class="hint">Nada para mostrar.</p>';
   // detalle
   const det=f.slice().sort((a,b)=>a.fecha<b.fecha?-1:a.fecha>b.fecha?1:(a.local<b.local?-1:1));
-  $('detalle').innerHTML=det.length?tabla(det.map(r=>'<tr><td>'+fb(r.fecha).slice(0,5)+'</td><td>'+esc(r.local)+'</td><td>'+esc(r.nombre)+'<div class="hint">'+esc(r.turno)+'</div></td><td><span class="'+(r.tipo==='merma'?'m':'p')+'">'+(r.tipo==='merma'?'MERMA':'POPI')+'</span> '+esc(r.prod)+'</td><td class="q">'+r.qty+'</td></tr>'),['Fecha','Sucursal','Empleado','Producto','Cant.']):'<p class="hint">Nada para mostrar.</p>';
+  $('detalle').innerHTML=det.length?tabla(det.map(r=>'<tr><td>'+fb(r.fecha).slice(0,5)+'</td><td>'+esc(r.local)+'</td><td>'+esc(r.nombre)+'<div class="hint">'+esc(r.turno)+'</div></td><td><span class="'+(r.tipo==='merma'?'m':(r.tipo==='compra'?'ok':'p'))+'">'+TL(r.tipo)+'</span> '+esc(r.prod)+(r.tipo==='popi'?(r.c?' <span class="ok">· compró algo</span>':' <span class="hint">· no compró</span>'):'')+'</td><td class="q">'+r.qty+'</td></tr>'),['Fecha','Sucursal','Empleado','Producto','Cant.']):'<p class="hint">Nada para mostrar.</p>';
 }
 ['modo','dia','mes','suc','tipo'].forEach(i=>$(i).addEventListener('change',render));
-function texto(){ return filtrado().sort((a,b)=>a.fecha<b.fecha?-1:1).map(r=>fb(r.fecha)+' · '+r.local+' · '+r.nombre+' ('+r.turno+') · '+(r.tipo==='merma'?'MERMA':'SUPER POPI')+': '+r.qty+' '+r.prod+' ('+(SEC[r.sec]||r.sec)+')').join('\n'); }
+function texto(){ return filtrado().sort((a,b)=>a.fecha<b.fecha?-1:1).map(r=>fb(r.fecha)+' · '+r.local+' · '+r.nombre+' ('+r.turno+') · '+TL(r.tipo,1)+': '+r.qty+' '+r.prod+' ('+(SEC[r.sec]||r.sec)+')').join('\n'); }
 async function copiar(){ try{ await navigator.clipboard.writeText(texto()); $('msg2').textContent='Copiado.'; }catch(e){ prompt('Copiá:',texto()); } }
 function csv(){
   const q=v=>'"'+String(v).replace(/"/g,'""')+'"';
   let c='﻿Fecha;Sucursal;Empleado;Turno;Tipo;Seccion;Producto;Cantidad\n';
-  filtrado().forEach(r=>{ c+=[fb(r.fecha),r.local,r.nombre,r.turno,r.tipo==='merma'?'Merma':'Super Popi',SEC[r.sec]||r.sec,r.prod,r.qty].map(q).join(';')+'\n'; });
+  filtrado().forEach(r=>{ c+=[fb(r.fecha),r.local,r.nombre,r.turno,(r.tipo==='merma'?'Merma':(r.tipo==='compra'?'Compró':'Super Popi')),SEC[r.sec]||r.sec,r.prod,r.qty].map(q).join(';')+'\n'; });
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([c],{type:'text/csv;charset=utf-8'})); a.download='registro_sucursales.csv'; a.click();
 }
 function borrarTodo(){ if(confirm('¿Borrar todo lo cargado en este panel? No se puede deshacer.')){ datos=[]; stocks=[]; guardar(); render(); $('msg').textContent='Borrado.'; } }
@@ -194,7 +195,7 @@ function estad(){
   const menos=pt.slice().reverse().slice(0,5);
   const hayDrop=dropT>0; const dp=sortD(dropProd);
   const rot=dp.slice(0,5), rotMenos=pt.filter(a=>a[1]>0).map(a=>[a[0],dropProd[a[0]]||0]).sort((a,b)=>a[1]-b[1]).slice(0,5);
-  const mermaP={}, popiP={}; mp.forEach(r=>{ const o=r.tipo==='merma'?mermaP:popiP; const k=kk(r.sec,r.prod); o[k]=(o[k]||0)+(Number(r.qty)||0); });
+  const mermaP={}, popiP={}, compraP={}; mp.forEach(r=>{ if(r.tipo==='compra'){ const k=kk(r.sec,r.prod); compraP[k]=(compraP[k]||0)+(Number(r.qty)||0); return; } const o=r.tipo==='merma'?mermaP:popiP; const k=kk(r.sec,r.prod); o[k]=(o[k]||0)+(Number(r.qty)||0); });
   let h='<div class="grid" style="margin-bottom:10px">'+
     kpi('Locales con stock',locs.length+(sel==='todas'?' / '+SUCS.length:''),sel==='todas'?'enviaron cierre':'último cierre '+fb(cur[locs[0]].f))+
     kpi('Unidades en stock',stockT,'suma de lo que quedó')+
@@ -209,6 +210,8 @@ function estad(){
     h+='<p class="hint" style="margin-top:10px">🔥 Más / menos salida: aparece cuando hay al menos 2 días de cierres. Elegí "Todo el mes".</p>';
   }
   h+='<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-top:12px"><div><h2>🗑️ Más merma</h2>'+lista(sortD(mermaP).slice(0,5),'var(--red)')+'</div><div><h2>⭐ Más Super Popi</h2>'+lista(sortD(popiP).slice(0,5),'var(--dark)')+'</div></div>';
+  const nComp=mp.filter(r=>r.tipo==='popi'&&r.c).length, nPopi=mp.filter(r=>r.tipo==='popi').length;
+  h+='<div style="margin-top:12px"><h2>🛒 Compraron junto con el Super Popi</h2>'+(nPopi?'<p class="hint">En '+nComp+' de '+nPopi+' Super Popi el empleado también compró algo ('+pc(nComp,nPopi)+'%).</p>':'')+lista(sortD(compraP).slice(0,8),'var(--ok)')+'</div>';
   if(sel==='todas'){
     const filas=locs.slice().sort((a,b)=>tot(b)-tot(a)).map(l=>{
       const m=cur[l].m, ks=Object.keys(m).sort((a,b)=>m[b]-m[a]); const ag=[...uni].filter(k=>!(m[k]>0));

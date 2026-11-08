@@ -173,11 +173,11 @@
 <header class="top">
   <div class="header-top-row">
     <img class="app-logo" id="appLogo" alt="Cheesequeria">
-    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span></h1>
+    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v3 · compra</span></h1>
   </div>
   <div class="meta-grid">
     <div class="meta-field" id="localField"><label>Local</label>
-      <select id="metaLocal"><option value="">— Elegí tu local —</option><option>Fuengirola</option><option>Miramar</option><option>Palo</option><option>Mayorazgo</option><option>Huelin</option><option>Teatinos</option><option>Marbella</option><option>Vialia</option><option>Granada</option><option>Nevada</option><option>Plaza Mayor</option><option>Almería</option><option>Carretería</option></select>
+      <select id="metaLocal"><option value="">— Elegí tu local —</option><option>Almería</option><option>Carretería</option><option>Fuengirola</option><option>Granada</option><option>Huelin</option><option>Marbella</option><option>Mayorazgo</option><option>Miramar</option><option>Nevada</option><option>Palo</option><option>Plaza Mayor</option><option>Teatinos</option><option>Vialia</option></select>
     </div>
     <div class="meta-field"><label>Turno</label>
       <select id="metaTurno"><option>Mañana</option><option>Tarde</option></select>
@@ -281,7 +281,7 @@
         <label style="font-weight:700;">Mes:</label>
         <input type="month" id="mmMes" style="flex:1;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-size:16px;">
       </div>
-      <div style="margin-bottom:8px;"><select id="mmTipo" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-size:16px;"><option value="todos">Merma y Super Popi</option><option value="merma">Solo merma</option><option value="popi">Solo Super Popi</option></select></div>
+      <div style="margin-bottom:8px;"><select id="mmTipo" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-size:16px;"><option value="todos">Merma y Super Popi</option><option value="merma">Solo merma</option><option value="compra">Solo compras</option><option value="popi">Solo Super Popi</option></select></div>
       <div id="mmInforme"></div>
       <button class="bigbtn" style="margin-top:10px;background:#25D366;" onclick="mermaImagen(true)">📤 Enviar informe por WhatsApp (imagen)</button>
       <button class="bigbtn secondary" style="margin-top:8px;" onclick="mermaCopiar()">📋 Copiar informe (WhatsApp / mail)</button>
@@ -2129,7 +2129,7 @@ const MERMA_SECCIONES = {
   otros:{titulo:'Merienda / otros', unidad:'unidades'},
 };
 const POPI_OTROS = ['Merienda'];
-const TIPO_TXT = {merma:'MERMA', popi:'SUPER POPI'};
+const TIPO_TXT = {merma:'MERMA', popi:'SUPER POPI', compra:'COMPRÓ'};
 let mermaMem = [];
 function mermaLeer(){
   try{ const r = localStorage.getItem(MERMA_KEY); if(r) return JSON.parse(r); }catch(e){}
@@ -2180,6 +2180,7 @@ function abrirMerma(bucket, tipo){
     + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;"><label style="font-weight:700;">Fecha:</label><input type="date" id="mmFecha" value="'+hoyISO()+'" style="flex:1;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-size:16px;"></div>'
     + '<div id="mmLista"></div>'
     + (bucket==='otros' ? '<div style="display:flex;gap:6px;margin:6px 0;"><input id="mmOtro" placeholder="Otro producto (escribir)" style="flex:1;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;"><button id="mmOtroB" type="button" style="padding:0 16px;border:0;border-radius:10px;background:#2B241D;color:#fff;font-weight:800;">Agregar</button></div>' : '')
+    + (esMerma ? '' : '<div style="margin:10px 0 6px;padding:10px;border:1.5px dashed '+color+';border-radius:12px;"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><b style="flex:1;min-width:130px;">🛒 ¿Compró algo?</b><button type="button" id="mmCNo" style="padding:10px 18px;border:0;border-radius:10px;font-size:15px;font-weight:800;background:#2B241D;color:#fff;">No</button><button type="button" id="mmCSi" style="padding:10px 18px;border:0;border-radius:10px;font-size:15px;font-weight:800;background:#ddd;color:#2B241D;">Sí</button></div><div id="mmCBox" style="display:none;margin-top:8px;"><p class="hint" style="margin:0 0 6px;">Tocá <b>+</b> en lo que <b>compró</b> (pagó).</p><div id="mmCLista"></div><div style="display:flex;gap:6px;margin:6px 0 0;"><input id="mmCOtro" placeholder="Otro producto comprado (escribir)" style="flex:1;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;"><button id="mmCOtroB" type="button" style="padding:0 16px;border:0;border-radius:10px;background:#2B241D;color:#fff;font-weight:800;">+</button></div></div></div>')
     + '<input id="mmNota" placeholder="Nota (opcional)'+(esMerma?': vencida, se cayó, rota...':'')+'" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;margin:6px 0 10px;box-sizing:border-box;">'
     + '<div style="display:flex;gap:8px;"><button id="mmCancel" style="flex:1;padding:14px;border:0;border-radius:12px;background:#ddd;font-size:16px;font-weight:700;">Cancelar</button><button id="mmSave" style="flex:2;padding:14px;border:0;border-radius:12px;background:'+color+';color:#fff;font-size:16px;font-weight:800;">Guardar '+(esMerma?'merma':'Super Popi')+'</button></div>';
   ov.appendChild(box); document.body.appendChild(ov);
@@ -2205,21 +2206,57 @@ function abrirMerma(bucket, tipo){
       box.querySelector('#mmOtro').value='';
     };
   }
+  // ---- ¿Compró algo? (solo Super Popi) ----
+  let compraSi = false; const cq = {}; const cItems = [];
+  if(!esMerma){
+    const cl = box.querySelector('#mmCLista');
+    const grupos = ['porcion','tarrina','cookie','tartaPeq','tartaMini','otros'];
+    const filaC = (b,sab)=>{
+      const key = b+'|'+sab; if(!(key in cq)){ cq[key]=0; cItems.push({key,b,sab}); }
+      const r = document.createElement('div'); r.className='mm-row'; r.dataset.k=key; r.style.setProperty('--x','1');
+      r.innerHTML='<div class="mm-n"></div><button type="button" class="mm-minus">−</button><div class="mm-q">0</div><button type="button" class="mm-plus">+</button>';
+      r.querySelector('.mm-n').textContent = sab;
+      const q = r.querySelector('.mm-q');
+      const upd = ()=>{ q.textContent = cq[key]; r.classList.toggle('on', cq[key]>0); r.querySelectorAll('button').forEach(x=>{ x.style.background=cq[key]>0?'#3F7A4E':''; x.style.color=cq[key]>0?'#fff':''; }); if(cq[key]>0){ r.style.background='#E6F2E8'; r.style.borderColor='#3F7A4E'; r.style.color='#25562F'; } else { r.style.background=''; r.style.borderColor=''; r.style.color=''; } };
+      r.querySelector('.mm-plus').onclick = ()=>{ cq[key]++; upd(); };
+      r.querySelector('.mm-minus').onclick = ()=>{ if(cq[key]>0) cq[key]--; upd(); };
+      r.querySelector('.mm-n').onclick = ()=>{ if(cq[key]===0){ cq[key]=1; upd(); } };
+      return {r,upd};
+    };
+    grupos.forEach(b=>{
+      const lst = b==='otros' ? POPI_OTROS.slice() : mermaSabores(b,'popi'); if(!lst.length) return;
+      const h = document.createElement('div'); h.style.cssText='font-weight:800;font-size:13px;color:#6B5F52;margin:8px 0 4px;text-transform:uppercase;'; h.textContent = MERMA_SECCIONES[b].titulo; cl.appendChild(h);
+      lst.forEach(sab=>{ cl.appendChild(filaC(b,sab).r); });
+    });
+    box.querySelector('#mmCOtroB').onclick = ()=>{
+      const n = box.querySelector('#mmCOtro').value.trim(); if(!n) return;
+      const key='otros|'+n;
+      if(!(key in cq)){ cl.appendChild(filaC('otros',n).r); }
+      cq[key]++; const row=[...cl.querySelectorAll('.mm-row')].find(x=>x.dataset.k===key); row.querySelector('.mm-q').textContent=cq[key]; row.classList.add('on'); row.style.background='#E6F2E8'; row.style.borderColor='#3F7A4E'; row.style.color='#25562F'; row.querySelectorAll('button').forEach(x=>{x.style.background='#3F7A4E';x.style.color='#fff';});
+      box.querySelector('#mmCOtro').value='';
+    };
+    const bNo=box.querySelector('#mmCNo'), bSi=box.querySelector('#mmCSi'), cb=box.querySelector('#mmCBox');
+    const setC = v=>{ compraSi=v; cb.style.display=v?'':'none'; bSi.style.background=v?'#3F7A4E':'#ddd'; bSi.style.color=v?'#fff':'#2B241D'; bNo.style.background=v?'#ddd':'#2B241D'; bNo.style.color=v?'#2B241D':'#fff'; };
+    bNo.onclick=()=>setC(false); bSi.onclick=()=>setC(true);
+  }
   box.querySelector('#mmCancel').onclick = ()=>ov.remove();
   box.querySelector('#mmSave').onclick = ()=>{
     const fecha = box.querySelector('#mmFecha').value || hoyISO();
     const nota = box.querySelector('#mmNota').value.trim();
     const items = sabores.filter(s=>qty[s]>0);
     if(!items.length){ alert('No marcaste ningún producto.'); return; }
+    const compras = (!esMerma && compraSi) ? cItems.filter(c=>cq[c.key]>0) : [];
+    if(!esMerma && compraSi && !compras.length){ alert('Marcaste "Sí compró" pero no elegiste qué compró. Elegí el producto o tocá "No".'); return; }
     const local = document.getElementById('metaLocal').value;
     const turno = document.getElementById('metaTurno').value;
     const persona = (document.getElementById('metaPersona').value||'').trim();
-    const nuevos = items.map(s=>({id:Date.now()+'_'+Math.random().toString(36).slice(2,6), tipo, fecha, local, turno, bucket, sabor:s, qty:qty[s], unidad:sec.unidad, nota, persona}));
+    const nuevos = items.map(s=>({id:Date.now()+'_'+Math.random().toString(36).slice(2,6), tipo, fecha, local, turno, bucket, sabor:s, qty:qty[s], unidad:sec.unidad, nota, persona, compro:(!esMerma&&compras.length)?1:0}));
+    compras.forEach(c=>nuevos.push({id:Date.now()+'_'+Math.random().toString(36).slice(2,6), tipo:'compra', fecha, local, turno, bucket:c.b, sabor:c.sab, qty:cq[c.key], unidad:MERMA_SECCIONES[c.b].unidad, nota:'', persona, compro:0}));
     mermaGuardar(mermaLeer().concat(nuevos));
     ov.remove();
     mermaPintarRojo();
     mermaRender();
-    alert((esMerma?'Merma':'Super Popi')+' guardado: '+items.map(s=>qty[s]+' '+s).join(', ')+' ('+fechaBonita(fecha)+').');
+    alert((esMerma?'Merma':'Super Popi')+' guardado: '+items.map(s=>qty[s]+' '+s).join(', ')+(compras.length?' · Compró: '+compras.map(c=>cq[c.key]+' '+c.sab).join(', '):'')+' ('+fechaBonita(fecha)+').');
   };
 }
 
@@ -2267,7 +2304,7 @@ function mermaRender(){
   if(!lst.length){ wrap.innerHTML='<p class="hint">No hay nada anotado en este mes.</p>'; return; }
   let h = '<table class="mm-t"><tr><th>Fecha</th><th>Producto</th><th style="text-align:right">Cant.</th><th></th></tr>';
   lst.forEach(m=>{
-    const c = tipoDe(m)==='merma' ? '#B23A2E' : THEME_ORANGE;
+    const c = tipoDe(m)==='merma' ? '#B23A2E' : (tipoDe(m)==='compra' ? '#3F7A4E' : THEME_ORANGE);
     h += '<tr><td>'+fechaBonita(m.fecha)+'</td><td><b style="color:'+c+'">'+TIPO_TXT[tipoDe(m)]+'</b> '+escH(m.sabor)+' <span style="color:var(--ink-soft);font-size:11.5px;">('+escH(MERMA_SECCIONES[m.bucket].titulo)+')</span><div style="font-size:11.5px;color:var(--ink-soft);">'+escH(m.persona||'')+(m.nota?' · '+escH(m.nota):'')+'</div></td><td class="q">'+m.qty+'</td><td><button onclick="mermaBorrar(\''+m.id+'\')" style="border:0;background:none;font-size:18px;">✕</button></td></tr>';
   });
   h += '</table>';
@@ -2369,7 +2406,7 @@ function regCodigo(){
   const l = mermaLeer().filter(m=>m.fecha===f && (m.persona||'').trim().toLowerCase()===nom.toLowerCase() && (m.turno||t)===t);
   if(!l.length) return '';
   const o = {v:1, local:document.getElementById('metaLocal').value, fecha:f, turno:t, nombre:nom,
-    recs:l.map(m=>({id:m.id,tipo:tipoDe(m),sec:m.bucket,prod:m.sabor,qty:m.qty}))};
+    recs:l.map(m=>({id:m.id,tipo:tipoDe(m),sec:m.bucket,prod:m.sabor,qty:m.qty,c:m.compro?1:0}))};
   return 'REG1:'+btoa(unescape(encodeURIComponent(JSON.stringify(o))));
 }
 
