@@ -173,7 +173,7 @@
 <header class="top">
   <div class="header-top-row">
     <img class="app-logo" id="appLogo" alt="Cheesequeria">
-    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v16 · % editable</span></h1>
+    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v17 · fotos pdf</span></h1>
   </div>
   <div class="meta-grid">
     <div class="meta-field" id="localField"><label>Local</label>
@@ -1387,7 +1387,7 @@ function chipRep(r){ let s=''; if(r.rep&&r.rep.length) s+=' <span style="display
   // ---- Imagen / PDF del informe (para mandarlo a mano por Gmail o WhatsApp) ----
   async function fotosInforme(local,dia,tsel){
     const okT=t=>!tsel||(tsel==='M'?/ma[ñn]ana/i:/tarde|noche/i).test(t||''); const out=[]; const cfg=nubeCfg();
-    const bajar=async p=>{ const r=await fetch(apiB(cfg)+p,{headers:hdr(cfg,true)}); const b=await r.blob(); return await new Promise((ok,ko)=>{ const f=new FileReader(); f.onload=()=>ok(f.result); f.onerror=ko; f.readAsDataURL(b); }); };
+    const bajar=async p=>{ const r=await fetch(apiB(cfg)+p,{headers:hdr(cfg,true)}); const b=await r.blob(); return await new Promise((ok,ko)=>{ const f=new FileReader(); f.onload=()=>ok('data:image/jpeg;base64,'+String(f.result).split(',')[1]); f.onerror=ko; f.readAsDataURL(b); }); };
     for(const d of datos.filter(d=>d.local===local&&d.fecha===dia&&d.tipo==='merma'&&(d.foto||d.fotoData)&&okT(d.turno))){ try{ out.push({t:'Merma: '+d.prod,u:d.fotoData||await bajar(d.foto)}); }catch(e){} }
     for(const g of glov.filter(g=>g.local===local&&g.fecha===dia&&g.img&&okT(g.turno))){ try{ out.push({t:'Glovo · '+(g.turno||''),u:await bajar(g.img)}); }catch(e){} }
     return out;
