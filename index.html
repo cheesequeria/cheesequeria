@@ -173,7 +173,7 @@
 <header class="top">
   <div class="header-top-row">
     <img class="app-logo" id="appLogo" alt="Cheesequeria">
-    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v9 · descuento</span></h1>
+    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v10 · informe</span></h1>
   </div>
   <div class="meta-grid">
     <div class="meta-field" id="localField"><label>Local</label>
@@ -204,6 +204,8 @@
     <div class="card">
       <button class="bigbtn" style="background:#00A082;color:#fff;" onclick="abrirGlovo()">🛵 Glovo e incidencias del turno</button>
       <p class="hint" style="margin-top:6px;">Cargá lo facturado por Glovo (a mano o con foto) y cualquier incidencia del turno. Le llega a Ricardo y a Maxi.</p>
+      <button class="bigbtn" style="margin-top:12px;background:#2B241D;color:#fff;" onclick="INF.abrir()">📄 Informe del día · enviar por mail</button>
+      <p class="hint" style="margin-top:6px;">Al terminar el turno, mandá primero la ficha de stock y después este informe. Sale por mail a Ricardo, Francisco y Noelia.</p>
     </div>
     <div class="card">
       <button class="bigbtn ghost" onclick="resetStock()">🗑️ Dejar la planilla en cero</button>
@@ -1235,6 +1237,167 @@ function abrirGlovo(){
     colaGuardar(cola); ov.remove(); vaciarCola(true);
   };
 }
+
+// ---------- Informe del día: lo envía cada local por mail ----------
+const INF=(function(){
+  const SEC={porcion:'Porciones',tarrina:'Tarrinas',cookie:'Cookies',tartaPeq:'Tarta Pequeña',tartaMini:'Tarta Mini',paneton:'Panetones',panetonP:'Panetones pequeños',roscon:'Roscones',rosconP:'Roscones pequeños',bebida:'Bebidas',otros:'Otros'};
+  const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const fb=f=>{ const a=String(f).split('-'); return a[2]+'/'+a[1]+'/'+a[0]; };
+  const SUCS=[]; let stocks=[], datos=[], glov=[];
+  const MAIL_TO=['lacheesequeriafuengirola@gmail.com','franciscohusillos@grupoelcaserito.com','ricardoalvarez@grupoelcaserito.com','noeliafigueroa@grupoelcaserito.com'];
+  function marcarRep(){
+  const esM=t=>/ma[ñn]ana/i.test(t||'');
+  const g={}; datos.forEach(r=>{ const k=r.local+'|'+r.fecha+'|'+r.tipo+'|'+(String(r.key||'').split('|').pop()); (g[k]=g[k]||[]).push(r); });
+  const quitar=new Set();
+  Object.values(g).forEach(a=>{ if(a.length<2) return; a.sort((x,y)=>(esM(y.turno)?1:0)-(esM(x.turno)?1:0)); const o=a[0]; o.rep=[...new Set(a.slice(1).map(x=>x.turno).filter(t=>t&&t!==o.turno))]; a.slice(1).forEach(x=>quitar.add(x)); });
+  if(quitar.size){ for(let i=datos.length-1;i>=0;i--) if(quitar.has(datos[i])) datos.splice(i,1); }
+  datos.forEach(r=>{ r.pos=null; if(esM(r.turno)) return; const o=datos.find(x=>x!==r&&x.local===r.local&&x.fecha===r.fecha&&x.tipo===r.tipo&&x.sec===r.sec&&x.prod===r.prod&&Number(x.qty)===Number(r.qty)&&esM(x.turno)); if(o) r.pos=o.turno; });
+}
+function chipT(t){ const m=/ma[ñn]ana/i.test(t||''); return '<span style="display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:800;color:#fff;background:'+(m?'#2B6CB0':'#C05621')+'">'+esc(t||'?')+'</span>'; }
+function chipRep(r){ let s=''; if(r.rep&&r.rep.length) s+=' <span style="display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:800;background:#E2E2E2;color:#555">ya informado en '+esc(r.turno)+' · repetido en '+esc(r.rep.join(', '))+'</span>'; if(r.pos) s+=' <span style="display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:800;background:#FFE9B5;color:#8A5A00">⚠️ posible repetido (también informado en '+esc(r.pos)+')</span>'; return s; }
+  function informeGen(dia, suc, tsel){
+  marcarRep();
+  const esM=t=>/ma[ñn]ana/i.test(t||''), esT=t=>/tarde|noche/i.test(t||'');
+  const okT=t=> !tsel || (tsel==='M'?esM(t):esT(t));
+  const kk=(s,p)=>s+'|'+p; const locs=suc?[suc]:SUCS;
+  const tit=tsel==='M'?' · TURNO MAÑANA':(tsel==='T'?' · TURNO TARDE':'');
+  let html='', text='📄 INFORME '+fb(dia)+tit+'\n'; let alguno=false;
+  const mapa=a=>{ const m={}; a.items.forEach(i=>{ const k=kk(i.sec,i.prod); m[k]=(m[k]||0)+(Number(i.qty)||0); }); return m; };
+  const tierDe=s=> s>=0.95?40: s>=0.8?30: s>=0.6?20: s>=0.4?10:0;
+  locs.forEach(l=>{
+    const st=stocks.filter(x=>x.local===l&&x.fecha===dia), dt=datos.filter(x=>x.local===l&&x.fecha===dia&&okT(x.turno)), gl=glov.filter(x=>x.local===l&&x.fecha===dia&&okT(x.turno));
+    if(!st.length&&!dt.length&&!gl.length) return; alguno=true;
+    const sM=st.filter(x=>esM(x.turno)).slice(-1)[0], sT=st.filter(x=>esT(x.turno)).slice(-1)[0];
+    let h='<div style="border:1.5px solid #E5DCCB;border-radius:12px;padding:10px;margin-bottom:10px;"><h2 style="margin:0 0 6px">'+esc(l)+'</h2>'; let t='\n━━━━━━━━━━\n🏪 '+l.toUpperCase()+'\n';
+    // quién envió
+    const quien=[sM?'Mañana: '+(sM.persona||'?'):null, sT?'Tarde: '+(sT.persona||'?'):null].filter(Boolean);
+    h+='<p class="hint" style="margin:0 0 4px">📝 Stock enviado por → '+(quien.length?esc(quien.join(' · ')):'sin informe de stock')+'</p>'; t+='📝 Stock enviado por: '+(quien.length?quien.join(' · '):'sin informe')+'\n';
+    // Super Popi
+    const popi=dt.filter(x=>x.tipo==='popi'), comp=dt.filter(x=>x.tipo==='compra');
+    h+='<h3 style="margin:8px 0 4px">⭐ Super Popi</h3>'; t+='\n⭐ SUPER POPI\n';
+    if(!popi.length){ h+='<p class="hint">No canjearon premio.</p>'; t+='• No canjearon premio\n'; }
+    else{ const g={}; popi.forEach(r=>{ const k=(r.turno||'')+' · '+(r.nombre||'?'); (g[k]=g[k]||[]).push(r); });
+      Object.keys(g).forEach(k=>{ const it=g[k].map(r=>r.qty+' '+r.prod).join(', '); const cp=comp.filter(c=>((c.turno||'')+' · '+(c.nombre||'?'))===k); const ct=cp.length?' — compró: '+cp.map(c=>c.qty+' '+c.prod).join(', '):' — no compró';
+        const rp=g[k].map(chipRep).join(''); const tx=g[k].map(r=>(r.rep&&r.rep.length?' [ya informado en '+r.turno+', repetido en '+r.rep.join(', ')+']':'')+(r.pos?' [posible repetido, también en '+r.pos+']':'')).join('');
+        h+='<div style="margin:2px 0">'+chipT(g[k][0].turno)+' <b>'+esc(g[k][0].nombre||'?')+'</b>: canjeó '+esc(it)+'<span class="hint">'+esc(ct)+'</span>'+rp+'</div>'; t+='• '+k+': canjeó '+it+ct+tx+'\n'; }); }
+    // Merma
+    const me=dt.filter(x=>x.tipo==='merma');
+    h+='<h3 style="margin:10px 0 4px">🗑️ Merma</h3>'; t+='\n🗑️ MERMA\n';
+    if(!me.length){ h+='<p class="hint">Sin merma.</p>'; t+='• Sin merma\n'; }
+    else{ h+='<table>'+me.map(r=>{ const mot=r.n||'sin motivo'; t+='• '+r.prod+' ('+(SEC[r.sec]||r.sec)+'): '+r.qty+' — '+mot+' (informado turno '+(r.turno||'')+')'+(r.rep&&r.rep.length?' [ya informado, repetido en '+r.rep.join(', ')+']':'')+(r.pos?' [posible repetido, también en '+r.pos+']':'')+'\n'; return '<tr><td>'+esc(r.prod)+' <span class="hint">'+esc(SEC[r.sec]||r.sec)+'</span></td><td class="q m">'+r.qty+'</td><td>'+esc(mot)+'<div>'+chipT(r.turno)+' <span class="hint">'+esc(r.nombre||'')+'</span>'+chipRep(r)+'</div></td></tr>'; }).join('')+'</table>'; }
+    // Glovo
+    h+='<h3 style="margin:10px 0 4px">🛵 Glovo</h3>'; t+='\n🛵 GLOVO\n';
+    const conG=gl.filter(x=>x.total||x.pedidos||x.detalle||x.img);
+    if(!conG.length){ h+='<p class="hint">Sin registro de Glovo.</p>'; t+='• Sin registro de Glovo\n'; }
+    else conG.sort((a,b)=>a.ts-b.ts).forEach(x=>{ const l1=[x.total?String(x.total).replace('.',',')+' €':'', x.pedidos?x.pedidos+' pedidos':''].filter(Boolean).join(' · ');
+      h+='<div style="margin:4px 0;padding:6px;background:#F3FBF9;border-radius:8px;"><b>'+esc(x.turno)+'</b> · enviado por <b>'+esc(x.nombre||'?')+'</b>'+(l1?'<div>'+esc(l1)+'</div>':'')+(x.detalle?'<div class="hint">'+esc(x.detalle)+'</div>':'')+(x.img?'<img data-p="'+esc(x.img)+'" style="display:none;max-width:100%;border-radius:8px;margin-top:6px;">':'')+'</div>';
+      t+='• '+x.turno+' ('+(x.nombre||'?')+'): '+(l1||'—')+(x.detalle?' — '+x.detalle:'')+(x.img?' [foto adjunta en el panel]':'')+'\n'; });
+    // Reposición (aprende del historial)
+    if(!tsel||tsel==='T'){
+      h+='<h3 style="margin:10px 0 4px">📦 Por favor enviar para mañana</h3>'; t+='\n📦 POR FAVOR ENVIAR PARA MAÑANA\n';
+      if(sM&&sT){
+        const M=mapa(sM), E=mapa(sT);
+        // historial: días anteriores con informe de mañana y tarde
+        const hist={}; let dias=0; const fechas=[...new Set(stocks.filter(x=>x.local===l&&x.fecha<dia).map(x=>x.fecha))].sort().slice(-14);
+        fechas.forEach(f=>{ const a=stocks.filter(x=>x.local===l&&x.fecha===f); const m1=a.filter(x=>esM(x.turno)).slice(-1)[0], t1=a.filter(x=>esT(x.turno)).slice(-1)[0]; if(!m1||!t1) return; dias++;
+          const Mm=mapa(m1), Ee=mapa(t1); Object.keys(Mm).forEach(k=>{ if(!(Mm[k]>0)) return; const e=Ee[k]||0; (hist[k]=hist[k]||[]).push(e===0?1:(Mm[k]-e)/Mm[k]); }); });
+        const usaH=dias>=3; const lis=[];
+        Object.keys(M).forEach(k=>{ if(!(M[k]>0)) return; const e=E[k]||0; const hoy=e===0?1:(M[k]-e)/M[k]; const hs=hist[k]||[]; const hm=hs.length>=3?hs.reduce((a,b)=>a+b,0)/hs.length:null;
+          const score=(usaH&&hm!==null)?(hoy+hm)/2:hoy; let p=tierDe(score); if(e===0) p=Math.max(p,30);
+          if(p) lis.push({k,p,M:M[k],e,hm,n:hs.length,ag:e===0}); });
+        lis.sort((a,b)=>b.p-a.p);
+        const baj=[];
+        Object.keys(M).forEach(k=>{ if(M[k]<4) return; const e=E[k]||0; if(e===0) return; const hoy=Math.max(0,(M[k]-e)/M[k]); const hs=(hist[k]||[]).map(x=>Math.max(0,x)); const hm=hs.length>=3?hs.reduce((a,b)=>a+b,0)/hs.length:null;
+          const score=(usaH&&hm!==null)?(hoy+hm)/2:hoy; const p=score<=0.05?30:(score<=0.15?20:0); if(p) baj.push({k,p,M:M[k],e,hm,n:hs.length}); });
+        baj.sort((a,b)=>b.p-a.p);
+        const nota=usaH?('Aprendiendo de los últimos '+dias+' días con informe de mañana y tarde.'):('Todavía aprendiendo ('+dias+' de 3 días necesarios): por ahora estimo solo con lo de hoy.');
+        if(!lis.length){ h+='<p class="hint">Nada se agotó rápido. No hace falta pedir de más.</p>'; t+='• Nada se agotó rápido\n'; }
+        else{ h+='<table>'+lis.map(r=>{ const a=r.k.split('|'); const hx=r.hm!==null?' · promedio '+r.n+' días: '+Math.round(r.hm*100)+'% de la mañana':''; t+='• '+a[1]+' ('+(SEC[a[0]]||a[0])+'): enviar +'+r.p+'%'+(r.ag?' — se agotó':'')+' (mañana '+r.M+' → noche '+r.e+(r.hm!==null?'; promedio '+r.n+' días '+Math.round(r.hm*100)+'%':'')+')\n'; return '<tr><td>'+esc(a[1])+' <span class="hint">'+esc(SEC[a[0]]||a[0])+'</span></td><td class="q" style="color:var(--red);font-weight:800">+'+r.p+'%</td><td><span class="hint">'+(r.ag?'se agotó':'salió rápido')+' · mañana '+r.M+' → noche '+r.e+esc(hx)+'</span></td></tr>'; }).join('')+'</table>'; }
+        h+='<p class="hint">'+esc(nota)+'</p>'; t+='('+nota+')\n';
+        h+='<h3 style="margin:10px 0 4px;color:#1F5FA8">📉 Bajar para mañana</h3>'; t+='\n📉 BAJAR PARA MAÑANA\n';
+        if(!baj.length){ h+='<p class="hint">No hay stock parado. Nada para bajar.</p>'; t+='• Nada para bajar\n'; }
+        else{ h+='<table>'+baj.map(r=>{ const a=r.k.split('|'); const hx=r.hm!==null?' · promedio '+r.n+' días: '+Math.round(r.hm*100)+'% de la mañana':''; t+='• '+a[1]+' ('+(SEC[a[0]]||a[0])+'): bajar -'+r.p+'% — mucho stock y casi no se movió (mañana '+r.M+' → noche '+r.e+(r.hm!==null?'; promedio '+r.n+' días '+Math.round(r.hm*100)+'%':'')+')\n'; return '<tr style="background:#EAF2FB"><td>'+esc(a[1])+' <span class="hint">'+esc(SEC[a[0]]||a[0])+'</span></td><td class="q" style="color:#1F5FA8;font-weight:800">-'+r.p+'%</td><td><span class="hint">mucho stock, casi no se movió · mañana '+r.M+' → noche '+r.e+esc(hx)+'</span></td></tr>'; }).join('')+'</table>'; }
+      } else { const f=(!sM?'mañana':'noche'); h+='<p class="hint">Falta el informe de '+f+' de este local para estimar.</p>'; t+='• Falta el informe de '+f+' para estimar\n'; }
+    }
+    // Incidencias (texto libre)
+    const ik=dia+'|'+l; let iv=''; try{ iv=localStorage.getItem('inc|'+ik)||''; }catch(e){}
+    const incApp=gl.filter(x=>x.incidencias).sort((a,b)=>a.ts-b.ts);
+    h+='<h3 style="margin:10px 0 4px">⚠️ Incidencias</h3>'; t+='\n⚠️ INCIDENCIAS\n';
+    incApp.forEach(x=>{ h+='<div style="margin:3px 0;padding:6px;background:#FFF6E5;border-radius:8px;"><b>'+esc(x.turno)+' · '+esc(x.nombre||'?')+'</b>: '+esc(x.incidencias)+'</div>'; t+='• '+x.turno+' ('+(x.nombre||'?')+'): '+x.incidencias+'\n'; });
+    h+='<textarea data-inc="'+esc(ik)+'" rows="3" placeholder="Escribí acá lo que quieras agregar al informe..." style="width:100%;box-sizing:border-box;padding:10px;border:1.5px solid #E5DCCB;border-radius:10px;font-size:15px;margin-top:4px;">'+esc(iv)+'</textarea>';
+    if(iv) t+='• '+iv+'\n'; if(!incApp.length&&!iv) t+='• Sin incidencias\n';
+    h+='</div>'; html+=h; text+=t;
+  });
+  if(!alguno){ html='<p class="hint">No hay datos para ese día.</p>'; text+='\nSin datos.'; }
+  else html+='<p class="hint">El % de reposición es una estimación. Se calcula con cuánto bajó cada sabor entre el informe de la mañana y el de la noche (y con el promedio de los días anteriores cuando ya hay al menos 3). Si se agotó, nunca baja de +30%. Para bajar: tenía 4 o más y se vendió casi nada (-20% o -30%).</p>';
+  return {html,text};
+}
+
+  const apiB=cfg=>'https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/contents/';
+  const hdr=(cfg,raw)=>({'Authorization':'Bearer '+cfg.tk,'Accept':raw?'application/vnd.github.raw+json':'application/vnd.github+json'});
+  async function lista(cfg,path){ const r=await fetch(apiB(cfg)+path,{headers:hdr(cfg,false)}); if(r.status===404) return []; if(!r.ok) throw new Error('HTTP '+r.status); return await r.json(); }
+  async function crudo(cfg,path){ const r=await fetch(apiB(cfg)+path,{headers:hdr(cfg,true)}); if(!r.ok) throw new Error('HTTP '+r.status); return await r.text(); }
+  async function cargarDatos(local,dia){
+    const cfg=nubeCfg(); if(!cfg) throw new Error('Falta config.js');
+    stocks=[]; datos=[]; glov=[]; SUCS.length=0; SUCS.push(local);
+    const [Y,M]=dia.split('-').map(Number); const prev=(M===1)?(Y-1)+'-12':Y+'-'+String(M-1).padStart(2,'0'); const cur=dia.slice(0,7);
+    const marca='__'+slug(local)+'__';
+    for(const mm of [prev,cur]){
+      const ls=(await lista(cfg,'cierres/'+mm)).filter(x=>x.name.endsWith('.json')&&x.name.includes(marca));
+      for(let i=0;i<ls.length;i+=6){ await Promise.all(ls.slice(i,i+6).map(async x=>{ try{
+        const o=JSON.parse(await crudo(cfg,'cierres/'+mm+'/'+x.name));
+        if(o.stock){ const s0=o.stock, me=s0.meta||{}; const items=[];
+          Object.keys(SEC).forEach(sk=>{ const st=(s0.stock||{})[sk]||{}; Object.keys(st).forEach(pn=>{ if(st[pn]) items.push({sec:sk,prod:pn,qty:st[pn]}); }); });
+          const cn=s0.customName||{}, sc=s0.stockCustom||{};
+          Object.keys(sc).forEach(slot=>{ const nm=(cn[slot]||'').trim(); const q=sc[slot]&&sc[slot].qty; const sk=slot.split('_')[0]; if(nm&&q) items.push({sec:SEC[sk]?sk:'porcion',prod:nm,qty:q}); });
+          const key=[me.local,me.fecha,me.turno,me.persona].join('|'); stocks=stocks.filter(z=>z.key!==key);
+          stocks.push({key,local:me.local,fecha:me.fecha,turno:me.turno,persona:me.persona,items}); }
+        if(o.reg){ const g=o.reg; (g.recs||[]).forEach(r=>{ const key=[g.local,g.fecha,g.turno,g.nombre,r.id].join('|'); if(datos.some(d=>d.key===key)) return;
+          datos.push({key,local:g.local,fecha:g.fecha,turno:g.turno,nombre:g.nombre,tipo:r.tipo,sec:r.sec,prod:r.prod,qty:r.qty,c:r.c?1:0,n:r.n||''}); }); }
+      }catch(e){} })); }
+    }
+    try{ const ls=(await lista(cfg,'glovo/'+cur)).filter(x=>x.name.endsWith('.json')&&x.name.includes(marca));
+      await Promise.all(ls.map(async x=>{ try{ glov.push(JSON.parse(await crudo(cfg,'glovo/'+cur+'/'+x.name))); }catch(e){} })); }catch(e){}
+  }
+  const b64Blob=b=>new Promise((ok,ko)=>{ const f=new FileReader(); f.onerror=ko; f.onload=()=>ok(String(f.result).split(',')[1]); f.readAsDataURL(b); });
+  async function enviarMail(local,dia,tsel,msg){
+    const c=window.CFG||{}; const tt=tsel==='M'?' · Turno mañana':(tsel==='T'?' · Turno tarde':'');
+    const asunto='Informe '+local+' '+fb(dia)+tt;
+    const texto='INFORME '+local.toUpperCase()+' · '+fb(dia)+tt+'\n'+informeGen(dia,local,tsel).text.split('\n').slice(2).join('\n');
+    if(c.mail){
+      msg.textContent='Enviando...';
+      try{
+        const cfg=nubeCfg(); const adj=[];
+        for(const x of glov.filter(g=>g.local===local&&g.fecha===dia&&g.img&&(!tsel||(tsel==='M'?/ma[ñn]ana/i:/tarde|noche/i).test(g.turno||'')))){ try{ const r=await fetch(apiB(cfg)+x.img,{headers:hdr(cfg,true)}); adj.push({nombre:'glovo-'+local+'-'+(x.turno||'')+'.jpg',tipo:'image/jpeg',b64:await b64Blob(await r.blob())}); }catch(e){} }
+        const r=await fetch(c.mail,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({key:c.mailKey||'',asunto,texto,adj})});
+        const j=await r.json(); msg.textContent=j.ok?'✔ Informe enviado por mail':'No se pudo enviar: '+(j.error||'error');
+      }catch(e){ msg.textContent='No pude confirmar el envío. Revisá con Maxi si llegó el mail.'; }
+    } else {
+      msg.innerHTML='<a target="_blank" rel="noopener" href="https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent(MAIL_TO.join(','))+'&su='+encodeURIComponent(asunto)+'&body='+encodeURIComponent(texto)+'" style="display:inline-block;padding:12px 16px;background:#C4661F;color:#fff;border-radius:10px;text-decoration:none;font-weight:800;">✉️ Abrir Gmail con el informe</a>';
+    }
+  }
+  async function abrir(){
+    const local=document.getElementById('metaLocal').value; if(!local){ alert('Primero elegí tu local arriba.'); return; }
+    const old=document.getElementById('infOv'); if(old) old.remove();
+    const ov=document.createElement('div'); ov.id='infOv'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99998;overflow:auto;padding:10px;';
+    const bx=document.createElement('div'); bx.style.cssText='background:#fff;border-radius:14px;max-width:640px;margin:0 auto;padding:14px;';
+    const d0=document.getElementById('metaFecha').value||new Date().toISOString().slice(0,10);
+    bx.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;"><h3 style="margin:0">📄 Informe · '+esc(local)+'</h3><button id="iX" style="padding:10px 14px;border:0;border-radius:10px;background:#ddd;font-weight:700;">Cerrar</button></div>'
+     +'<div style="display:flex;gap:8px;margin:10px 0;"><input type="date" id="iD" value="'+d0+'" style="flex:1;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;"><select id="iT" style="flex:1;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;"><option value="">Todo el día</option><option value="M">Turno mañana</option><option value="T">Turno tarde</option></select></div>'
+     +'<div id="iC" class="hint">Cargando...</div>'
+     +'<button id="iMail" style="width:100%;margin-top:10px;padding:16px;border:0;border-radius:12px;background:#C4661F;color:#fff;font-size:17px;font-weight:800;">✉️ Enviar informe por mail</button><div id="iMsg" style="margin-top:8px;font-weight:700;"></div>';
+    ov.appendChild(bx); document.body.appendChild(ov);
+    const $=id=>bx.querySelector('#'+id);
+    const gen=()=>{ $('iC').innerHTML=informeGen($('iD').value,local,$('iT').value).html;
+      $('iC').querySelectorAll('img[data-p]').forEach(im=>{ const cfg=nubeCfg(); fetch(apiB(cfg)+im.dataset.p,{headers:hdr(cfg,true)}).then(r=>r.blob()).then(b=>{ im.src=URL.createObjectURL(b); im.style.display='block'; }).catch(()=>{}); });
+      $('iC').querySelectorAll('textarea[data-inc]').forEach(t=>{ t.oninput=()=>{ try{ localStorage.setItem('inc|'+t.dataset.inc,t.value); }catch(e){} }; }); };
+    const carga=async()=>{ $('iC').textContent='Cargando...'; $('iMsg').textContent=''; try{ await cargarDatos(local,$('iD').value); gen(); }catch(e){ $('iC').textContent='No se pudo cargar ('+e.message+'). Revisá internet y probá de nuevo.'; } };
+    $('iD').onchange=carga; $('iT').onchange=gen; $('iX').onclick=()=>ov.remove();
+    $('iMail').onclick=()=>enviarMail(local,$('iD').value,$('iT').value,$('iMsg'));
+    carga();
+  }
+  return {abrir};
+})();
 window.addEventListener('load', function(){ setTimeout(function(){ vaciarCola(false); }, 1500); });
 
 // ---------------------------------------------------------------
