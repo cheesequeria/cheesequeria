@@ -109,6 +109,16 @@ function filtrado(sinSuc){
 function tabla(rows,cab){ return '<table><tr>'+cab.map(c=>'<th>'+c+'</th>').join('')+'</tr>'+rows.join('')+'</table>'; }
 
 
+function marcarRep(){
+  const esM=t=>/ma[ñn]ana/i.test(t||'');
+  const g={}; datos.forEach(r=>{ const k=r.local+'|'+r.fecha+'|'+r.tipo+'|'+(String(r.key||'').split('|').pop()); (g[k]=g[k]||[]).push(r); });
+  const quitar=new Set();
+  Object.values(g).forEach(a=>{ if(a.length<2) return; a.sort((x,y)=>(esM(y.turno)?1:0)-(esM(x.turno)?1:0)); const o=a[0]; o.rep=[...new Set(a.slice(1).map(x=>x.turno).filter(t=>t&&t!==o.turno))]; a.slice(1).forEach(x=>quitar.add(x)); });
+  if(quitar.size){ for(let i=datos.length-1;i>=0;i--) if(quitar.has(datos[i])) datos.splice(i,1); }
+  datos.forEach(r=>{ r.pos=null; if(esM(r.turno)) return; const o=datos.find(x=>x!==r&&x.local===r.local&&x.fecha===r.fecha&&x.tipo===r.tipo&&x.sec===r.sec&&x.prod===r.prod&&Number(x.qty)===Number(r.qty)&&esM(x.turno)); if(o) r.pos=o.turno; });
+}
+function chipT(t){ const m=/ma[ñn]ana/i.test(t||''); return '<span style="display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:800;color:#fff;background:'+(m?'#2B6CB0':'#C05621')+'">'+esc(t||'?')+'</span>'; }
+function chipRep(r){ let s=''; if(r.rep&&r.rep.length) s+=' <span style="display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:800;background:#E2E2E2;color:#555">ya informado en '+esc(r.turno)+' · repetido en '+esc(r.rep.join(', '))+'</span>'; if(r.pos) s+=' <span style="display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;font-weight:800;background:#FFE9B5;color:#8A5A00">⚠️ posible repetido (también informado en '+esc(r.pos)+')</span>'; return s; }
 let glov=[]; const glovCache=new Set();
 function ghBase(){ const c=cfgN(); return 'https://api.github.com/repos/'+c.owner+'/'+c.repo+'/'; }
 async function ghBlob(path){ const c=cfgN(); const r=await fetch(ghBase()+'contents/'+path,{headers:{'Authorization':'Bearer '+c.tk,'Accept':'application/vnd.github.raw+json'}}); if(!r.ok) throw new Error('HTTP '+r.status); return URL.createObjectURL(await r.blob()); }
@@ -145,6 +155,7 @@ function informe(){
   carga();
 }
 function informeGen(dia, suc, tsel){
+  marcarRep();
   const esM=t=>/ma[ñn]ana/i.test(t||''), esT=t=>/tarde|noche/i.test(t||'');
   const okT=t=> !tsel || (tsel==='M'?esM(t):esT(t));
   const kk=(s,p)=>s+'|'+p; const locs=suc?[suc]:SUCS;
@@ -166,12 +177,13 @@ function informeGen(dia, suc, tsel){
     if(!popi.length){ h+='<p class="hint">No canjearon premio.</p>'; t+='• No canjearon premio\n'; }
     else{ const g={}; popi.forEach(r=>{ const k=(r.turno||'')+' · '+(r.nombre||'?'); (g[k]=g[k]||[]).push(r); });
       Object.keys(g).forEach(k=>{ const it=g[k].map(r=>r.qty+' '+r.prod).join(', '); const cp=comp.filter(c=>((c.turno||'')+' · '+(c.nombre||'?'))===k); const ct=cp.length?' — compró: '+cp.map(c=>c.qty+' '+c.prod).join(', '):' — no compró';
-        h+='<div style="margin:2px 0"><b>'+esc(k)+'</b>: canjeó '+esc(it)+'<span class="hint">'+esc(ct)+'</span></div>'; t+='• '+k+': canjeó '+it+ct+'\n'; }); }
+        const rp=g[k].map(chipRep).join(''); const tx=g[k].map(r=>(r.rep&&r.rep.length?' [ya informado en '+r.turno+', repetido en '+r.rep.join(', ')+']':'')+(r.pos?' [posible repetido, también en '+r.pos+']':'')).join('');
+        h+='<div style="margin:2px 0">'+chipT(g[k][0].turno)+' <b>'+esc(g[k][0].nombre||'?')+'</b>: canjeó '+esc(it)+'<span class="hint">'+esc(ct)+'</span>'+rp+'</div>'; t+='• '+k+': canjeó '+it+ct+tx+'\n'; }); }
     // Merma
     const me=dt.filter(x=>x.tipo==='merma');
     h+='<h3 style="margin:10px 0 4px">🗑️ Merma</h3>'; t+='\n🗑️ MERMA\n';
     if(!me.length){ h+='<p class="hint">Sin merma.</p>'; t+='• Sin merma\n'; }
-    else{ h+='<table>'+me.map(r=>{ const mot=r.n||'sin motivo'; t+='• '+r.prod+' ('+(SEC[r.sec]||r.sec)+'): '+r.qty+' — '+mot+' ('+(r.turno||'')+')\n'; return '<tr><td>'+esc(r.prod)+' <span class="hint">'+esc(SEC[r.sec]||r.sec)+'</span></td><td class="q m">'+r.qty+'</td><td>'+esc(mot)+'<div class="hint">'+esc((r.turno||'')+' · '+(r.nombre||''))+'</div></td></tr>'; }).join('')+'</table>'; }
+    else{ h+='<table>'+me.map(r=>{ const mot=r.n||'sin motivo'; t+='• '+r.prod+' ('+(SEC[r.sec]||r.sec)+'): '+r.qty+' — '+mot+' (informado turno '+(r.turno||'')+')'+(r.rep&&r.rep.length?' [ya informado, repetido en '+r.rep.join(', ')+']':'')+(r.pos?' [posible repetido, también en '+r.pos+']':'')+'\n'; return '<tr><td>'+esc(r.prod)+' <span class="hint">'+esc(SEC[r.sec]||r.sec)+'</span></td><td class="q m">'+r.qty+'</td><td>'+esc(mot)+'<div>'+chipT(r.turno)+' <span class="hint">'+esc(r.nombre||'')+'</span>'+chipRep(r)+'</div></td></tr>'; }).join('')+'</table>'; }
     // Glovo
     h+='<h3 style="margin:10px 0 4px">🛵 Glovo</h3>'; t+='\n🛵 GLOVO\n';
     const conG=gl.filter(x=>x.total||x.pedidos||x.detalle||x.img);
@@ -193,10 +205,17 @@ function informeGen(dia, suc, tsel){
           const score=(usaH&&hm!==null)?(hoy+hm)/2:hoy; let p=tierDe(score); if(e===0) p=Math.max(p,30);
           if(p) lis.push({k,p,M:M[k],e,hm,n:hs.length,ag:e===0}); });
         lis.sort((a,b)=>b.p-a.p);
+        const baj=[];
+        Object.keys(M).forEach(k=>{ if(M[k]<4) return; const e=E[k]||0; if(e===0) return; const hoy=Math.max(0,(M[k]-e)/M[k]); const hs=(hist[k]||[]).map(x=>Math.max(0,x)); const hm=hs.length>=3?hs.reduce((a,b)=>a+b,0)/hs.length:null;
+          const score=(usaH&&hm!==null)?(hoy+hm)/2:hoy; const p=score<=0.05?30:(score<=0.15?20:0); if(p) baj.push({k,p,M:M[k],e,hm,n:hs.length}); });
+        baj.sort((a,b)=>b.p-a.p);
         const nota=usaH?('Aprendiendo de los últimos '+dias+' días con informe de mañana y tarde.'):('Todavía aprendiendo ('+dias+' de 3 días necesarios): por ahora estimo solo con lo de hoy.');
         if(!lis.length){ h+='<p class="hint">Nada se agotó rápido. No hace falta pedir de más.</p>'; t+='• Nada se agotó rápido\n'; }
         else{ h+='<table>'+lis.map(r=>{ const a=r.k.split('|'); const hx=r.hm!==null?' · promedio '+r.n+' días: '+Math.round(r.hm*100)+'% de la mañana':''; t+='• '+a[1]+' ('+(SEC[a[0]]||a[0])+'): enviar +'+r.p+'%'+(r.ag?' — se agotó':'')+' (mañana '+r.M+' → noche '+r.e+(r.hm!==null?'; promedio '+r.n+' días '+Math.round(r.hm*100)+'%':'')+')\n'; return '<tr><td>'+esc(a[1])+' <span class="hint">'+esc(SEC[a[0]]||a[0])+'</span></td><td class="q" style="color:var(--red);font-weight:800">+'+r.p+'%</td><td><span class="hint">'+(r.ag?'se agotó':'salió rápido')+' · mañana '+r.M+' → noche '+r.e+esc(hx)+'</span></td></tr>'; }).join('')+'</table>'; }
         h+='<p class="hint">'+esc(nota)+'</p>'; t+='('+nota+')\n';
+        h+='<h3 style="margin:10px 0 4px;color:#1F5FA8">📉 Bajar para mañana</h3>'; t+='\n📉 BAJAR PARA MAÑANA\n';
+        if(!baj.length){ h+='<p class="hint">No hay stock parado. Nada para bajar.</p>'; t+='• Nada para bajar\n'; }
+        else{ h+='<table>'+baj.map(r=>{ const a=r.k.split('|'); const hx=r.hm!==null?' · promedio '+r.n+' días: '+Math.round(r.hm*100)+'% de la mañana':''; t+='• '+a[1]+' ('+(SEC[a[0]]||a[0])+'): bajar -'+r.p+'% — mucho stock y casi no se movió (mañana '+r.M+' → noche '+r.e+(r.hm!==null?'; promedio '+r.n+' días '+Math.round(r.hm*100)+'%':'')+')\n'; return '<tr style="background:#EAF2FB"><td>'+esc(a[1])+' <span class="hint">'+esc(SEC[a[0]]||a[0])+'</span></td><td class="q" style="color:#1F5FA8;font-weight:800">-'+r.p+'%</td><td><span class="hint">mucho stock, casi no se movió · mañana '+r.M+' → noche '+r.e+esc(hx)+'</span></td></tr>'; }).join('')+'</table>'; }
       } else { const f=(!sM?'mañana':'noche'); h+='<p class="hint">Falta el informe de '+f+' de este local para estimar.</p>'; t+='• Falta el informe de '+f+' para estimar\n'; }
     }
     // Incidencias (texto libre)
@@ -209,12 +228,12 @@ function informeGen(dia, suc, tsel){
     h+='</div>'; html+=h; text+=t;
   });
   if(!alguno){ html='<p class="hint">No hay datos para ese día.</p>'; text+='\nSin datos.'; }
-  else html+='<p class="hint">El % de reposición es una estimación. Se calcula con cuánto bajó cada sabor entre el informe de la mañana y el de la noche (y con el promedio de los días anteriores cuando ya hay al menos 3). Si se agotó, nunca baja de +30%.</p>';
+  else html+='<p class="hint">El % de reposición es una estimación. Se calcula con cuánto bajó cada sabor entre el informe de la mañana y el de la noche (y con el promedio de los días anteriores cuando ya hay al menos 3). Si se agotó, nunca baja de +30%. Para bajar: tenía 4 o más y se vendió casi nada (-20% o -30%).</p>';
   return {html,text};
 }
 
 function TL(t,l){ return t==='merma'?'MERMA':(t==='compra'?'COMPRÓ':(l?'SUPER POPI':'POPI')); }
-function render(){ try{ estad(); }catch(e){ console.error(e); }
+function render(){ try{ marcarRep(); }catch(e){} try{ estad(); }catch(e){ console.error(e); }
   const modo=$('modo').value; $('wD').style.display=modo==='dia'?'':'none'; $('wM').style.display=modo==='mes'?'':'none';
   // estado por sucursal (sin filtrar tipo/sucursal)
   const modoD=$('modo').value, dia=$('dia').value, mes=$('mes').value;
@@ -255,7 +274,7 @@ function render(){ try{ estad(); }catch(e){ console.error(e); }
   $('porProd').innerHTML=pk.length?tabla(pk.map(k=>{const a=k.split('|');return '<tr><td><span class="'+(a[0]==='merma'?'m':(a[0]==='compra'?'ok':'p'))+'">'+TL(a[0])+'</span> '+esc(a[1])+' <span class="hint">('+esc(a[2])+')</span></td><td class="q">'+pp[k]+'</td></tr>';}),['Producto','Cant.']):'<p class="hint">Nada para mostrar.</p>';
   // detalle
   const det=f.slice().sort((a,b)=>a.fecha<b.fecha?-1:a.fecha>b.fecha?1:(a.local<b.local?-1:1));
-  $('detalle').innerHTML=det.length?tabla(det.map(r=>'<tr><td>'+fb(r.fecha).slice(0,5)+'</td><td>'+esc(r.local)+'</td><td>'+esc(r.nombre)+'<div class="hint">'+esc(r.turno)+'</div></td><td><span class="'+(r.tipo==='merma'?'m':(r.tipo==='compra'?'ok':'p'))+'">'+TL(r.tipo)+'</span> '+esc(r.prod)+(r.tipo==='popi'?(r.c?' <span class="ok">· compró algo</span>':' <span class="hint">· no compró</span>'):'')+(r.n?'<div class="hint">Motivo: '+esc(r.n)+'</div>':'')+'</td><td class="q">'+r.qty+'</td></tr>'),['Fecha','Sucursal','Empleado','Producto','Cant.']):'<p class="hint">Nada para mostrar.</p>';
+  $('detalle').innerHTML=det.length?tabla(det.map(r=>'<tr><td>'+fb(r.fecha).slice(0,5)+'</td><td>'+esc(r.local)+'</td><td>'+esc(r.nombre)+'<div>'+chipT(r.turno)+'</div></td><td><span class="'+(r.tipo==='merma'?'m':(r.tipo==='compra'?'ok':'p'))+'">'+TL(r.tipo)+'</span> '+esc(r.prod)+(r.tipo==='popi'?(r.c?' <span class="ok">· compró algo</span>':' <span class="hint">· no compró</span>'):'')+(r.n?'<div class="hint">Motivo: '+esc(r.n)+'</div>':'')+chipRep(r)+'</td><td class="q">'+r.qty+'</td></tr>'),['Fecha','Sucursal','Empleado','Producto','Cant.']):'<p class="hint">Nada para mostrar.</p>';
 }
 ['modo','dia','mes','suc','tipo'].forEach(i=>$(i).addEventListener('change',render));
 function texto(){ return filtrado().sort((a,b)=>a.fecha<b.fecha?-1:1).map(r=>fb(r.fecha)+' · '+r.local+' · '+r.nombre+' ('+r.turno+') · '+TL(r.tipo,1)+': '+r.qty+' '+r.prod+' ('+(SEC[r.sec]||r.sec)+')').join('\n'); }
