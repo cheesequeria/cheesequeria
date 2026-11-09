@@ -136,12 +136,41 @@ async function informeDatos(dia){
     await Promise.all(nombres.map(async n=>{ try{ const o=JSON.parse(await ghGet('contents/glovo/'+cur+'/'+n,true)); o._n=n; glov.push(o); glovCache.add(n); }catch(e){} }));
   }catch(e){}
 }
+
+const MAIL_TO=['lacheesequeriafuengirola@gmail.com','franciscohusillos@grupoelcaserito.com','ricardoalvarez@grupoelcaserito.com','noeliafigueroa@grupoelcaserito.com'];
+function b64Blob(blob){ return new Promise((ok,ko)=>{ const f=new FileReader(); f.onerror=ko; f.onload=()=>ok(String(f.result).split(',')[1]); f.readAsDataURL(blob); }); }
+async function mailEnviar(dia, suc, tsel, msg){
+  const c=window.CFG||{}; const fb2=fb(dia);
+  // locales a enviar: el elegido o todos los que tengan datos ese día
+  const hay=l=>stocks.some(x=>x.local===l&&x.fecha===dia)||datos.some(x=>x.local===l&&x.fecha===dia)||glov.some(x=>x.local===l&&x.fecha===dia);
+  const locs=suc?[suc]:SUCS.filter(hay);
+  if(!locs.length){ msg.innerHTML='No hay datos para ese día.'; return; }
+  const tt=tsel==='M'?' · Turno mañana':(tsel==='T'?' · Turno tarde':'');
+  const mails=locs.map(l=>({l, asunto:'Informe '+l+' '+fb2+tt, texto:informeGen(dia,l,tsel).text.replace(/^[\s\S]*?\n(━━━━━━━━━━\n)?/,'')}));
+  // texto de cada mail: encabezado propio + secciones del local
+  mails.forEach(m=>{ m.texto='INFORME '+m.l.toUpperCase()+' · '+fb2+tt+'\n'+informeGen(dia,m.l,tsel).text.split('\n').slice(2).join('\n'); });
+  if(c.mail){
+    msg.innerHTML='Enviando...';
+    const res=[];
+    for(const m of mails){
+      try{
+        const adj=[]; for(const x of glov.filter(g=>g.local===m.l&&g.fecha===dia&&g.img&&(!tsel||(tsel==='M'?/ma[ñn]ana/i:/tarde|noche/i).test(g.turno||'')))){ try{ const u=await ghBlob(x.img); const b=await (await fetch(u)).blob(); adj.push({nombre:'glovo-'+m.l+'-'+(x.turno||'')+'.jpg',tipo:'image/jpeg',b64:await b64Blob(b)}); }catch(e){} }
+        const r=await fetch(c.mail,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({key:c.mailKey||'',asunto:m.asunto,texto:m.texto,adj})});
+        const j=await r.json(); res.push(j.ok?'✔ '+m.l+' enviado':'✘ '+m.l+': '+(j.error||'error'));
+      }catch(e){ res.push('? '+m.l+': no pude confirmar el envío (revisá la bandeja de enviados)'); }
+    }
+    msg.innerHTML=res.map(esc).join('<br>');
+  } else {
+    msg.innerHTML='Se abre Gmail con todo escrito; solo tocá <b>Enviar</b>:<br>'+mails.map(m=>'<a target="_blank" rel="noopener" style="display:inline-block;margin:4px 6px 0 0;padding:10px 14px;background:#C4661F;color:#fff;border-radius:10px;text-decoration:none;font-weight:800;" href="https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent(MAIL_TO.join(','))+'&su='+encodeURIComponent(m.asunto)+'&body='+encodeURIComponent(m.texto)+'">✉️ '+esc(m.l)+'</a>').join('')+'<div class="hint" style="margin-top:6px">Si el mail sale cortado o sin las fotos de Glovo, usá "Copiar texto" y pegalo en el cuerpo.</div>';
+  }
+}
+
 function informe(){
   const old=document.getElementById('infOv'); if(old) old.remove();
   const ov=document.createElement('div'); ov.id='infOv'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9998;overflow:auto;padding:10px;';
   const bx=document.createElement('div'); bx.style.cssText='background:#fff;border-radius:14px;max-width:780px;margin:0 auto;padding:14px;';
   const d0=$('dia').value||new Date().toISOString().slice(0,10);
-  bx.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;"><h2 style="margin:0">📄 Informe</h2><button class="g" id="infX">Cerrar</button></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;"><div><label>Día</label><input type="date" id="infD" value="'+d0+'"></div><div><label>Sucursal</label><select id="infS"><option value="">Todas</option>'+SUCS.map(x=>'<option>'+esc(x)+'</option>').join('')+'</select></div><div><label>Turno</label><select id="infT"><option value="">Todo el día</option><option value="M">Mañana</option><option value="T">Tarde</option></select></div></div><div id="infC"><p class="hint">Cargando...</p></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;"><button class="g" id="infCp">📋 Copiar texto</button><button class="g" id="infWa">💬 WhatsApp</button></div>';
+  bx.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;"><h2 style="margin:0">📄 Informe</h2><button class="g" id="infX">Cerrar</button></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;"><div><label>Día</label><input type="date" id="infD" value="'+d0+'"></div><div><label>Sucursal</label><select id="infS"><option value="">Todas</option>'+SUCS.map(x=>'<option>'+esc(x)+'</option>').join('')+'</select></div><div><label>Turno</label><select id="infT"><option value="">Todo el día</option><option value="M">Mañana</option><option value="T">Tarde</option></select></div></div><div id="infC"><p class="hint">Cargando...</p></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;"><button class="g" id="infCp">📋 Copiar texto</button><button class="g" id="infWa">💬 WhatsApp</button><button class="g" id="infMail" style="background:#C4661F;color:#fff;">✉️ Enviar por mail</button></div><div id="infMsg" class="hint" style="margin-top:8px;font-size:14px;"></div>';
   ov.appendChild(bx); document.body.appendChild(ov);
   let txt='';
   const gen=()=>{ const r=informeGen($('infD').value,$('infS').value,$('infT').value); $('infC').innerHTML=r.html; txt=r.text;
@@ -151,6 +180,7 @@ function informe(){
   const carga=async()=>{ $('infC').innerHTML='<p class="hint">Cargando datos...</p>'; try{ await informeDatos($('infD').value); }catch(e){} gen(); };
   $('infD').onchange=carga; $('infS').onchange=gen; $('infT').onchange=gen; $('infX').onclick=()=>ov.remove();
   $('infCp').onclick=async()=>{ try{ await navigator.clipboard.writeText(txt); }catch(e){ const t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); } $('infCp').textContent='✔ Copiado'; };
+  $('infMail').onclick=()=>mailEnviar($('infD').value,$('infS').value,$('infT').value,$('infMsg'));
   $('infWa').onclick=()=>window.open('https://wa.me/?text='+encodeURIComponent(txt),'_blank');
   carga();
 }
