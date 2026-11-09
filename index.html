@@ -173,7 +173,7 @@
 <header class="top">
   <div class="header-top-row">
     <img class="app-logo" id="appLogo" alt="Cheesequeria">
-    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v14 · informe editable</span></h1>
+    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v15 · pdf/jpg</span></h1>
   </div>
   <div class="meta-grid">
     <div class="meta-field" id="localField"><label>Local</label>
@@ -1384,6 +1384,57 @@ function chipRep(r){ let s=''; if(r.rep&&r.rep.length) s+=' <span style="display
       msg.innerHTML='<a target="_blank" rel="noopener" href="https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent(MAIL_TO.join(','))+'&su='+encodeURIComponent(asunto)+'&body='+encodeURIComponent(texto)+'" style="display:inline-block;padding:12px 16px;background:#C4661F;color:#fff;border-radius:10px;text-decoration:none;font-weight:800;">✉️ Abrir Gmail con el informe</a>';
     }
   }
+  // ---- Imagen / PDF del informe (para mandarlo a mano por Gmail o WhatsApp) ----
+  async function fotosInforme(local,dia,tsel){
+    const okT=t=>!tsel||(tsel==='M'?/ma[ñn]ana/i:/tarde|noche/i).test(t||''); const out=[]; const cfg=nubeCfg();
+    const bajar=async p=>{ const r=await fetch(apiB(cfg)+p,{headers:hdr(cfg,true)}); const b=await r.blob(); return await new Promise((ok,ko)=>{ const f=new FileReader(); f.onload=()=>ok(f.result); f.onerror=ko; f.readAsDataURL(b); }); };
+    for(const d of datos.filter(d=>d.local===local&&d.fecha===dia&&d.tipo==='merma'&&(d.foto||d.fotoData)&&okT(d.turno))){ try{ out.push({t:'Merma: '+d.prod,u:d.fotoData||await bajar(d.foto)}); }catch(e){} }
+    for(const g of glov.filter(g=>g.local===local&&g.fecha===dia&&g.img&&okT(g.turno))){ try{ out.push({t:'Glovo · '+(g.turno||''),u:await bajar(g.img)}); }catch(e){} }
+    return out;
+  }
+  const cargaImg=u=>new Promise((ok,ko)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=ko; i.src=u; });
+  async function construirCanvas(local,dia,tsel){
+    const tt=tsel==='M'?' · Turno mañana':(tsel==='T'?' · Turno tarde':'');
+    const lines=('INFORME '+local.toUpperCase()+' · '+fb(dia)+tt+'\n'+informeGen(dia,local,tsel).text.split('\n').slice(2).join('\n')).split('\n');
+    const W=1000, PAD=40, FS=28, LH=40; const meas=document.createElement('canvas').getContext('2d'); meas.font=FS+'px sans-serif';
+    const wr=[]; lines.forEach((ln,ix)=>{ if(ix===0) return; if(!ln.trim()){ wr.push(''); return; } let cur=''; ln.split(' ').forEach(w=>{ const tst=cur?cur+' '+w:w; if(meas.measureText(tst).width>W-2*PAD&&cur){ wr.push(cur); cur='   '+w; } else cur=tst; }); wr.push(cur); });
+    const fotos=await fotosInforme(local,dia,tsel); const imgs=[]; for(const f of fotos){ try{ imgs.push({t:f.t,i:await cargaImg(f.u)}); }catch(e){} }
+    let H=110+PAD+wr.length*LH+40; imgs.forEach(x=>{ const k=Math.min(1,(W-2*PAD)/x.i.width); x.w=Math.round(x.i.width*k); x.h=Math.round(x.i.height*k); H+=x.h+LH+30; });
+    const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const c=cv.getContext('2d');
+    c.fillStyle='#fff'; c.fillRect(0,0,W,H); c.fillStyle=(local==='Fuengirola')?'#5C3A21':'#E8823C'; c.fillRect(0,0,W,90);
+    c.fillStyle='#fff'; c.font='bold 36px sans-serif'; c.textBaseline='middle'; c.fillText(lines[0],PAD,45);
+    c.textBaseline='alphabetic'; let y=90+PAD+FS;
+    wr.forEach(l=>{ const tit=/^(⭐|🗑️|🛵|📦|📉|⚠️|🏪|📝)/.test(l); c.font=(tit?'bold ':'')+FS+'px sans-serif'; c.fillStyle=tit?'#2B241D':'#333'; c.fillText(l,PAD,y); y+=LH; });
+    y+=20; imgs.forEach(x=>{ c.font='bold 26px sans-serif'; c.fillStyle='#2B241D'; c.fillText('📷 '+x.t,PAD,y); y+=12; c.drawImage(x.i,PAD,y,x.w,x.h); y+=x.h+LH+18; });
+    return cv;
+  }
+  function pdfDeJpg(jpgDataUrl,w,h){
+    const bin=atob(jpgDataUrl.split(',')[1]); const jb=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) jb[i]=bin.charCodeAt(i);
+    const PW=595, PH=Math.round(h*PW/w); const enc=new TextEncoder(); const parts=[]; const off=[]; let pos=0;
+    const add=u=>{ parts.push(u); pos+=u.length; }; const addS=str=>add(enc.encode(str));
+    addS('%PDF-1.4\n');
+    off[1]=pos; addS('1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n');
+    off[2]=pos; addS('2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n');
+    off[3]=pos; addS('3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 '+PW+' '+PH+']/Resources<</XObject<</Im0 4 0 R>>>>/Contents 5 0 R>>endobj\n');
+    off[4]=pos; addS('4 0 obj<</Type/XObject/Subtype/Image/Width '+w+'/Height '+h+'/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length '+jb.length+'>>stream\n'); add(jb); addS('\nendstream endobj\n');
+    const cs='q '+PW+' 0 0 '+PH+' 0 0 cm /Im0 Do Q';
+    off[5]=pos; addS('5 0 obj<</Length '+cs.length+'>>stream\n'+cs+'\nendstream endobj\n');
+    const xr=pos; addS('xref\n0 6\n0000000000 65535 f \n'); for(let i=1;i<=5;i++) addS(String(off[i]).padStart(10,'0')+' 00000 n \n');
+    addS('trailer<</Size 6/Root 1 0 R>>\nstartxref\n'+xr+'\n%%EOF');
+    return new Blob(parts,{type:'application/pdf'});
+  }
+  async function exportar(tipo,local,dia,tsel,msg){
+    msg.textContent='Preparando '+(tipo==='pdf'?'PDF':'imagen')+'...';
+    try{
+      const cv=await construirCanvas(local,dia,tsel); const jpg=cv.toDataURL('image/jpeg',0.9);
+      const nombre='Informe-'+slug(local)+'-'+dia+(tsel?'-'+tsel:'')+(tipo==='pdf'?'.pdf':'.jpg');
+      let blob; if(tipo==='pdf') blob=pdfDeJpg(jpg,cv.width,cv.height); else blob=await new Promise(ok=>cv.toBlob(ok,'image/jpeg',0.9));
+      const file=new File([blob],nombre,{type:blob.type});
+      if(navigator.canShare&&navigator.canShare({files:[file]})){ try{ await navigator.share({files:[file],title:'Informe '+local+' '+fb(dia)}); msg.textContent='✔ Listo. Elegí Gmail para mandarlo.'; return; }catch(e){ if(e&&e.name==='AbortError'){ msg.textContent=''; return; } } }
+      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=nombre; document.body.appendChild(a); a.click(); setTimeout(()=>a.remove(),1000);
+      msg.innerHTML='✔ Descargado: <b>'+esc(nombre)+'</b>. Adjuntalo en Gmail y mandalo a: '+esc(MAIL_TO.join(', '));
+    }catch(e){ msg.textContent='No se pudo generar ('+e.message+').'; }
+  }
   async function abrir(){
     const local=document.getElementById('metaLocal').value; if(!local){ alert('Primero elegí tu local arriba.'); return; }
     const old=document.getElementById('infOv'); if(old) old.remove();
@@ -1393,7 +1444,8 @@ function chipRep(r){ let s=''; if(r.rep&&r.rep.length) s+=' <span style="display
     bx.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;"><h3 style="margin:0">📄 Informe · '+esc(local)+'</h3><button id="iX" style="padding:10px 14px;border:0;border-radius:10px;background:#ddd;font-weight:700;">Cerrar</button></div>'
      +'<div style="display:flex;gap:8px;margin:10px 0;"><input type="date" id="iD" value="'+d0+'" style="flex:1;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;"><select id="iT" style="flex:1;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;"><option value="">Todo el día</option><option value="M">Turno mañana</option><option value="T">Turno tarde</option></select></div>'
      +'<div id="iC" class="hint">Cargando...</div>'
-     +'<button id="iMail" style="width:100%;margin-top:10px;padding:16px;border:0;border-radius:12px;background:#C4661F;color:#fff;font-size:17px;font-weight:800;">✉️ Enviar informe por mail</button><div id="iMsg" style="margin-top:8px;font-weight:700;"></div>';
+     +'<div style="display:flex;gap:8px;margin-top:10px;"><button id="iJpg" style="flex:1;padding:14px;border:0;border-radius:12px;background:#2B241D;color:#fff;font-size:16px;font-weight:800;">🖼️ Imagen (JPG)</button><button id="iPdf" style="flex:1;padding:14px;border:0;border-radius:12px;background:#2B241D;color:#fff;font-size:16px;font-weight:800;">📄 PDF</button></div>'
+     +'<button id="iMail" style="width:100%;margin-top:8px;padding:16px;border:0;border-radius:12px;background:#C4661F;color:#fff;font-size:17px;font-weight:800;">✉️ Enviar informe por mail</button><div id="iMsg" style="margin-top:8px;font-weight:700;"></div>';
     ov.appendChild(bx); document.body.appendChild(ov);
     const $=id=>bx.querySelector('#'+id);
     const gen=()=>{ $('iC').innerHTML=informeGen($('iD').value,local,$('iT').value).html;
@@ -1407,6 +1459,8 @@ function chipRep(r){ let s=''; if(r.rep&&r.rep.length) s+=' <span style="display
       $('iC').querySelectorAll('textarea[data-inc]').forEach(t=>{ t.oninput=()=>{ try{ localStorage.setItem('inc|'+t.dataset.inc,t.value); }catch(e){} }; }); };
     const carga=async()=>{ $('iC').textContent='Cargando...'; $('iMsg').textContent=''; try{ await cargarDatos(local,$('iD').value); gen(); }catch(e){ $('iC').textContent='No se pudo cargar ('+e.message+'). Revisá internet y probá de nuevo.'; } };
     $('iD').onchange=carga; $('iT').onchange=gen; $('iX').onclick=()=>ov.remove();
+    $('iJpg').onclick=()=>exportar('jpg',local,$('iD').value,$('iT').value,$('iMsg'));
+    $('iPdf').onclick=()=>exportar('pdf',local,$('iD').value,$('iT').value,$('iMsg'));
     $('iMail').onclick=()=>enviarMail(local,$('iD').value,$('iT').value,$('iMsg'));
     carga();
   }
