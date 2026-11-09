@@ -173,7 +173,7 @@
 <header class="top">
   <div class="header-top-row">
     <img class="app-logo" id="appLogo" alt="Cheesequeria">
-    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v15 · pdf/jpg</span></h1>
+    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v16 · % editable</span></h1>
   </div>
   <div class="meta-grid">
     <div class="meta-field" id="localField"><label>Local</label>
@@ -1450,7 +1450,7 @@ function chipRep(r){ let s=''; if(r.rep&&r.rep.length) s+=' <span style="display
     const $=id=>bx.querySelector('#'+id);
     const gen=()=>{ $('iC').innerHTML=informeGen($('iD').value,local,$('iT').value).html;
       $('iC').querySelectorAll('img[data-p]').forEach(im=>{ const cfg=nubeCfg(); fetch(apiB(cfg)+im.dataset.p,{headers:hdr(cfg,true)}).then(r=>r.blob()).then(b=>{ im.src=URL.createObjectURL(b); im.style.display='block'; }).catch(()=>{}); });
-      $('iC').querySelectorAll('input[data-ov]').forEach(i=>{ i.onchange=()=>{ const v=Math.round(Number(i.value)); OVR[i.dataset.ov]=(v>0)?v:null; gen(); }; });
+      $('iC').querySelectorAll('input[data-ov]').forEach(i=>{ i.onchange=()=>{ const raw=String(i.value).trim(); const v=Math.round(Number(raw)); if(raw===''||!isFinite(v)||v<0){ gen(); return; } OVR[i.dataset.ov]=v; gen(); }; });
       $('iC').querySelectorAll('button[data-ovx]').forEach(b=>{ b.onclick=()=>{ OVR[b.dataset.ovx]=null; gen(); }; });
       $('iC').querySelectorAll('button[data-ovr]').forEach(b=>{ b.onclick=()=>{ Object.keys(OVR).forEach(k=>{ if(OVR[k]===null) delete OVR[k]; }); gen(); }; });
       $('iC').querySelectorAll('input[data-mf]').forEach(i=>{ i.onchange=async e=>{ const f=e.target.files[0]; const d=datos[+i.dataset.mf]; if(!f||!d) return; try{ const du=await comprimirImagen(f,1000,0.65); d.fotoData=du; const cfg=nubeCfg(); if(cfg){ const p='merma/'+d.fecha.slice(0,7)+'/'+d.fecha+'__'+slug(d.local)+'__'+slug(d.turno)+'__'+slug(d.nombre)+'__'+Date.now()+'.jpg'; const cola=colaLeer(); cola.push({path:p,b64:du.split(',')[1]}); colaGuardar(cola); vaciarCola(false); } gen(); }catch(x){ alert('No se pudo leer la foto.'); } }; });
