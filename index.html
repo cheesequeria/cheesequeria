@@ -173,7 +173,7 @@
 <header class="top">
   <div class="header-top-row">
     <img class="app-logo" id="appLogo" alt="Cheesequeria">
-    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v11 · foto merma</span></h1>
+    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v12 · borrar</span></h1>
   </div>
   <div class="meta-grid">
     <div class="meta-field" id="localField"><label>Local</label>
@@ -1243,7 +1243,7 @@ const INF=(function(){
   const SEC={porcion:'Porciones',tarrina:'Tarrinas',cookie:'Cookies',tartaPeq:'Tarta Pequeña',tartaMini:'Tarta Mini',paneton:'Panetones',panetonP:'Panetones pequeños',roscon:'Roscones',rosconP:'Roscones pequeños',bebida:'Bebidas',otros:'Otros'};
   const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const fb=f=>{ const a=String(f).split('-'); return a[2]+'/'+a[1]+'/'+a[0]; };
-  const SUCS=[]; let stocks=[], datos=[], glov=[];
+  const SUCS=[]; let stocks=[], datos=[], glov=[], shaImg={};
   const MAIL_TO=['lacheesequeriafuengirola@gmail.com','franciscohusillos@grupoelcaserito.com','ricardoalvarez@grupoelcaserito.com','noeliafigueroa@grupoelcaserito.com'];
   function marcarRep(){
   const esM=t=>/ma[ñn]ana/i.test(t||'');
@@ -1284,13 +1284,13 @@ function chipRep(r){ let s=''; if(r.rep&&r.rep.length) s+=' <span style="display
     const me=dt.filter(x=>x.tipo==='merma');
     h+='<h3 style="margin:10px 0 4px">🗑️ Merma</h3>'; t+='\n🗑️ MERMA\n';
     if(!me.length){ h+='<p class="hint">Sin merma.</p>'; t+='• Sin merma\n'; }
-    else{ h+='<table>'+me.map(r=>{ const mot=r.n||'sin motivo'; t+='• '+r.prod+' ('+(SEC[r.sec]||r.sec)+'): '+r.qty+' — '+mot+' (informado turno '+(r.turno||'')+')'+(r.rep&&r.rep.length?' [ya informado, repetido en '+r.rep.join(', ')+']':'')+(r.pos?' [posible repetido, también en '+r.pos+']':'')+(r.foto?' [foto adjunta]':'')+'\n'; return '<tr><td>'+esc(r.prod)+' <span class="hint">'+esc(SEC[r.sec]||r.sec)+'</span></td><td class="q m">'+r.qty+'</td><td>'+esc(mot)+'<div>'+chipT(r.turno)+' <span class="hint">'+esc(r.nombre||'')+'</span>'+chipRep(r)+(r.foto?'<img data-p="'+esc(r.foto)+'" style="display:none;max-width:100%;border-radius:8px;margin-top:6px;">':'')+'</div></td></tr>'; }).join('')+'</table>'; }
+    else{ h+='<table>'+me.map(r=>{ const mot=r.n||'sin motivo'; t+='• '+r.prod+' ('+(SEC[r.sec]||r.sec)+'): '+r.qty+' — '+mot+' (informado turno '+(r.turno||'')+')'+(r.rep&&r.rep.length?' [ya informado, repetido en '+r.rep.join(', ')+']':'')+(r.pos?' [posible repetido, también en '+r.pos+']':'')+(r.foto?' [foto adjunta]':'')+'\n'; return '<tr><td>'+'<button data-mx="'+datos.indexOf(r)+'" style="float:right;border:0;background:#eee;border-radius:8px;padding:4px 10px;font-size:16px;font-weight:800;color:#B23A2E;">✕</button>'+esc(r.prod)+' <span class="hint">'+esc(SEC[r.sec]||r.sec)+'</span></td><td class="q m">'+r.qty+'</td><td>'+esc(mot)+'<div>'+chipT(r.turno)+' <span class="hint">'+esc(r.nombre||'')+'</span>'+chipRep(r)+(r.foto?'<img data-p="'+esc(r.foto)+'" style="display:none;max-width:100%;border-radius:8px;margin-top:6px;">':'')+'</div></td></tr>'; }).join('')+'</table>'; }
     // Glovo
     h+='<h3 style="margin:10px 0 4px">🛵 Glovo</h3>'; t+='\n🛵 GLOVO\n';
     const conG=gl.filter(x=>x.total||x.pedidos||x.detalle||x.img);
     if(!conG.length){ h+='<p class="hint">Sin registro de Glovo.</p>'; t+='• Sin registro de Glovo\n'; }
     else conG.sort((a,b)=>a.ts-b.ts).forEach(x=>{ const l1=[x.total?String(x.total).replace('.',',')+' €':'', x.pedidos?x.pedidos+' pedidos':''].filter(Boolean).join(' · ');
-      h+='<div style="margin:4px 0;padding:6px;background:#F3FBF9;border-radius:8px;"><b>'+esc(x.turno)+'</b> · enviado por <b>'+esc(x.nombre||'?')+'</b>'+(l1?'<div>'+esc(l1)+'</div>':'')+(x.detalle?'<div class="hint">'+esc(x.detalle)+'</div>':'')+(x.img?'<img data-p="'+esc(x.img)+'" style="display:none;max-width:100%;border-radius:8px;margin-top:6px;">':'')+'</div>';
+      h+='<div style="margin:4px 0;padding:6px;background:#F3FBF9;border-radius:8px;">'+'<button data-gx="'+glov.indexOf(x)+'" style="float:right;border:0;background:#eee;border-radius:8px;padding:4px 10px;font-size:16px;font-weight:800;color:#B23A2E;">✕</button>'+'<b>'+esc(x.turno)+'</b> · enviado por <b>'+esc(x.nombre||'?')+'</b>'+(l1?'<div>'+esc(l1)+'</div>':'')+(x.detalle?'<div class="hint">'+esc(x.detalle)+'</div>':'')+(x.img?'<img data-p="'+esc(x.img)+'" style="display:none;max-width:100%;border-radius:8px;margin-top:6px;">':'')+'</div>';
       t+='• '+x.turno+' ('+(x.nombre||'?')+'): '+(l1||'—')+(x.detalle?' — '+x.detalle:'')+(x.img?' [foto adjunta en el panel]':'')+'\n'; });
     // Reposición (aprende del historial)
     if(!tsel||tsel==='T'){
@@ -1356,9 +1356,11 @@ function chipRep(r){ let s=''; if(r.rep&&r.rep.length) s+=' <span style="display
           datos.push({key,local:g.local,fecha:g.fecha,turno:g.turno,nombre:g.nombre,tipo:r.tipo,sec:r.sec,prod:r.prod,qty:r.qty,c:r.c?1:0,n:r.n||'',foto:r.f||''}); }); }
       }catch(e){} })); }
     }
-    try{ const ls=(await lista(cfg,'glovo/'+cur)).filter(x=>x.name.endsWith('.json')&&x.name.includes(marca));
-      await Promise.all(ls.map(async x=>{ try{ glov.push(JSON.parse(await crudo(cfg,'glovo/'+cur+'/'+x.name))); }catch(e){} })); }catch(e){}
+    try{ const all=await lista(cfg,'glovo/'+cur); shaImg={}; all.forEach(z=>{ shaImg['glovo/'+cur+'/'+z.name]=z.sha; }); const ls=all.filter(x=>x.name.endsWith('.json')&&x.name.includes(marca));
+      await Promise.all(ls.map(async x=>{ try{ const g0=JSON.parse(await crudo(cfg,'glovo/'+cur+'/'+x.name)); g0._p='glovo/'+cur+'/'+x.name; g0._sha=x.sha; if(!glov.some(z=>z._p===g0._p)) glov.push(g0); }catch(e){} })); }catch(e){}
   }
+  async function delGh(cfg,path,sha){ const r=await fetch(apiB(cfg)+path,{method:'DELETE',headers:Object.assign(hdr(cfg,false),{'Content-Type':'application/json'}),body:JSON.stringify({message:'borrar '+path.split('/').pop(),sha})}); if(!r.ok&&r.status!==404) throw new Error('HTTP '+r.status); }
+  async function borrarGlovo(x){ const cfg=nubeCfg(); if(x.img&&shaImg[x.img]) await delGh(cfg,x.img,shaImg[x.img]); await delGh(cfg,x._p,x._sha); }
   const b64Blob=b=>new Promise((ok,ko)=>{ const f=new FileReader(); f.onerror=ko; f.onload=()=>ok(String(f.result).split(',')[1]); f.readAsDataURL(b); });
   async function enviarMail(local,dia,tsel,msg){
     const c=window.CFG||{}; const tt=tsel==='M'?' · Turno mañana':(tsel==='T'?' · Turno tarde':'');
@@ -1392,6 +1394,8 @@ function chipRep(r){ let s=''; if(r.rep&&r.rep.length) s+=' <span style="display
     const $=id=>bx.querySelector('#'+id);
     const gen=()=>{ $('iC').innerHTML=informeGen($('iD').value,local,$('iT').value).html;
       $('iC').querySelectorAll('img[data-p]').forEach(im=>{ const cfg=nubeCfg(); fetch(apiB(cfg)+im.dataset.p,{headers:hdr(cfg,true)}).then(r=>r.blob()).then(b=>{ im.src=URL.createObjectURL(b); im.style.display='block'; }).catch(()=>{}); });
+      $('iC').querySelectorAll('button[data-mx]').forEach(b=>{ b.onclick=()=>{ if(!confirm('¿Sacar esta merma del informe? (no se borra de la nube, solo no sale en este mail)')) return; datos.splice(+b.dataset.mx,1); gen(); }; });
+      $('iC').querySelectorAll('button[data-gx]').forEach(b=>{ b.onclick=async()=>{ const x=glov[+b.dataset.gx]; if(!x||!confirm('¿Borrar este registro de Glovo definitivamente? (también desaparece del panel de Ricardo)')) return; b.disabled=true; try{ await borrarGlovo(x); glov.splice(+b.dataset.gx,1); gen(); }catch(e){ alert('No se pudo borrar ('+e.message+').'); b.disabled=false; } }; });
       $('iC').querySelectorAll('textarea[data-inc]').forEach(t=>{ t.oninput=()=>{ try{ localStorage.setItem('inc|'+t.dataset.inc,t.value); }catch(e){} }; }); };
     const carga=async()=>{ $('iC').textContent='Cargando...'; $('iMsg').textContent=''; try{ await cargarDatos(local,$('iD').value); gen(); }catch(e){ $('iC').textContent='No se pudo cargar ('+e.message+'). Revisá internet y probá de nuevo.'; } };
     $('iD').onchange=carga; $('iT').onchange=gen; $('iX').onclick=()=>ov.remove();
