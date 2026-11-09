@@ -48,7 +48,7 @@ table{width:100%;border-collapse:collapse;font-size:13.5px;} th,td{border-bottom
  <div class="card"><h2>Totales por sucursal</h2><div id="porSuc"></div></div>
  <div class="card"><h2>Totales por producto</h2><div id="porProd"></div></div>
  <div class="card"><h2>Detalle</h2><div id="detalle"></div>
-  <div class="row" style="margin-top:10px;"><button class="g" onclick="copiar()">📋 Copiar</button><button class="g" onclick="csv()">⬇️ Excel (CSV)</button><button class="r" onclick="borrarTodo()">Borrar todo lo cargado</button></div>
+  <div class="row" style="margin-top:10px;"><button class="g" onclick="informe()">📄 Informe</button><button class="g" onclick="copiar()">📋 Copiar</button><button class="g" onclick="csv()">⬇️ Excel (CSV)</button><button class="r" onclick="borrarTodo()">Borrar todo lo cargado</button></div>
   <div id="msg2" class="msg"></div>
  </div>
 </main>
@@ -91,7 +91,7 @@ function cargar(txtIn, silent){
         const key=[o.local,o.fecha,o.turno,o.nombre,r.id].join('|');
         if(have.has(key)){ repetidos++; return; }
         have.add(key); nuevos++;
-        datos.push({key,local:o.local,fecha:o.fecha,turno:o.turno,nombre:o.nombre,tipo:r.tipo,sec:r.sec,prod:r.prod,qty:r.qty,c:r.c?1:0});
+        datos.push({key,local:o.local,fecha:o.fecha,turno:o.turno,nombre:o.nombre,tipo:r.tipo,sec:r.sec,prod:r.prod,qty:r.qty,c:r.c?1:0,n:r.n||''});
       });
     }catch(e){ malos++; }
   }
@@ -107,6 +107,112 @@ function filtrado(sinSuc){
   return datos.filter(r=>(modo==='dia'?r.fecha===dia:r.fecha.slice(0,7)===mes)&&(sinSuc||suc==='todas'||r.local===suc)&&(tipo==='todos'||r.tipo===tipo));
 }
 function tabla(rows,cab){ return '<table><tr>'+cab.map(c=>'<th>'+c+'</th>').join('')+'</tr>'+rows.join('')+'</table>'; }
+
+
+let glov=[]; const glovCache=new Set();
+function ghBase(){ const c=cfgN(); return 'https://api.github.com/repos/'+c.owner+'/'+c.repo+'/'; }
+async function ghBlob(path){ const c=cfgN(); const r=await fetch(ghBase()+'contents/'+path,{headers:{'Authorization':'Bearer '+c.tk,'Accept':'application/vnd.github.raw+json'}}); if(!r.ok) throw new Error('HTTP '+r.status); return URL.createObjectURL(await r.blob()); }
+async function informeDatos(dia){
+  // carga el mes del día y el anterior (para aprender del historial) + Glovo del mes
+  const [Y,M]=dia.split('-').map(Number); const prev=(M===1)?(Y-1)+'-12':Y+'-'+String(M-1).padStart(2,'0'); const cur=dia.slice(0,7);
+  for(const mm of [prev,cur]){
+    try{ const lista=await ghGet('contents/cierres/'+mm,false)||[];
+      const nombres=lista.filter(x=>x.name.endsWith('.json')).map(x=>x.name).filter(n=>!cache.has(mm+'/'+n));
+      for(let i=0;i<nombres.length;i+=6){ await Promise.all(nombres.slice(i,i+6).map(async n=>{ try{ const o=JSON.parse(await ghGet('contents/cierres/'+mm+'/'+n,true)); let s=''; if(o.stock) s+='STOCK1:'+btoa(unescape(encodeURIComponent(JSON.stringify(o.stock))))+'\n'; if(o.reg) s+='REG1:'+btoa(unescape(encodeURIComponent(JSON.stringify(o.reg))))+'\n'; cargar(s,true); cache.add(mm+'/'+n); }catch(e){} })); }
+    }catch(e){}
+  }
+  try{ const lista=await ghGet('contents/glovo/'+cur,false)||[];
+    const nombres=lista.filter(x=>x.name.endsWith('.json')).map(x=>x.name).filter(n=>!glovCache.has(n));
+    await Promise.all(nombres.map(async n=>{ try{ const o=JSON.parse(await ghGet('contents/glovo/'+cur+'/'+n,true)); o._n=n; glov.push(o); glovCache.add(n); }catch(e){} }));
+  }catch(e){}
+}
+function informe(){
+  const old=document.getElementById('infOv'); if(old) old.remove();
+  const ov=document.createElement('div'); ov.id='infOv'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9998;overflow:auto;padding:10px;';
+  const bx=document.createElement('div'); bx.style.cssText='background:#fff;border-radius:14px;max-width:780px;margin:0 auto;padding:14px;';
+  const d0=$('dia').value||new Date().toISOString().slice(0,10);
+  bx.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;"><h2 style="margin:0">📄 Informe</h2><button class="g" id="infX">Cerrar</button></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;"><div><label>Día</label><input type="date" id="infD" value="'+d0+'"></div><div><label>Sucursal</label><select id="infS"><option value="">Todas</option>'+SUCS.map(x=>'<option>'+esc(x)+'</option>').join('')+'</select></div><div><label>Turno</label><select id="infT"><option value="">Todo el día</option><option value="M">Mañana</option><option value="T">Tarde</option></select></div></div><div id="infC"><p class="hint">Cargando...</p></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;"><button class="g" id="infCp">📋 Copiar texto</button><button class="g" id="infWa">💬 WhatsApp</button></div>';
+  ov.appendChild(bx); document.body.appendChild(ov);
+  let txt='';
+  const gen=()=>{ const r=informeGen($('infD').value,$('infS').value,$('infT').value); $('infC').innerHTML=r.html; txt=r.text;
+    $('infC').querySelectorAll('img[data-p]').forEach(im=>{ ghBlob(im.dataset.p).then(u=>{ im.src=u; im.style.display='block'; }).catch(()=>{ im.replaceWith(Object.assign(document.createElement('span'),{className:'hint',textContent:'(no se pudo cargar la imagen)'})); }); });
+    $('infC').querySelectorAll('textarea[data-inc]').forEach(t=>{ t.oninput=()=>{ try{ localStorage.setItem('inc|'+t.dataset.inc,t.value); }catch(e){} txt=informeGen($('infD').value,$('infS').value,$('infT').value).text; }; });
+  };
+  const carga=async()=>{ $('infC').innerHTML='<p class="hint">Cargando datos...</p>'; try{ await informeDatos($('infD').value); }catch(e){} gen(); };
+  $('infD').onchange=carga; $('infS').onchange=gen; $('infT').onchange=gen; $('infX').onclick=()=>ov.remove();
+  $('infCp').onclick=async()=>{ try{ await navigator.clipboard.writeText(txt); }catch(e){ const t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); } $('infCp').textContent='✔ Copiado'; };
+  $('infWa').onclick=()=>window.open('https://wa.me/?text='+encodeURIComponent(txt),'_blank');
+  carga();
+}
+function informeGen(dia, suc, tsel){
+  const esM=t=>/ma[ñn]ana/i.test(t||''), esT=t=>/tarde|noche/i.test(t||'');
+  const okT=t=> !tsel || (tsel==='M'?esM(t):esT(t));
+  const kk=(s,p)=>s+'|'+p; const locs=suc?[suc]:SUCS;
+  const tit=tsel==='M'?' · TURNO MAÑANA':(tsel==='T'?' · TURNO TARDE':'');
+  let html='', text='📄 INFORME '+fb(dia)+tit+'\n'; let alguno=false;
+  const mapa=a=>{ const m={}; a.items.forEach(i=>{ const k=kk(i.sec,i.prod); m[k]=(m[k]||0)+(Number(i.qty)||0); }); return m; };
+  const tierDe=s=> s>=0.95?40: s>=0.8?30: s>=0.6?20: s>=0.4?10:0;
+  locs.forEach(l=>{
+    const st=stocks.filter(x=>x.local===l&&x.fecha===dia), dt=datos.filter(x=>x.local===l&&x.fecha===dia&&okT(x.turno)), gl=glov.filter(x=>x.local===l&&x.fecha===dia&&okT(x.turno));
+    if(!st.length&&!dt.length&&!gl.length) return; alguno=true;
+    const sM=st.filter(x=>esM(x.turno)).slice(-1)[0], sT=st.filter(x=>esT(x.turno)).slice(-1)[0];
+    let h='<div style="border:1.5px solid #E5DCCB;border-radius:12px;padding:10px;margin-bottom:10px;"><h2 style="margin:0 0 6px">'+esc(l)+'</h2>'; let t='\n━━━━━━━━━━\n🏪 '+l.toUpperCase()+'\n';
+    // quién envió
+    const quien=[sM?'Mañana: '+(sM.persona||'?'):null, sT?'Tarde: '+(sT.persona||'?'):null].filter(Boolean);
+    h+='<p class="hint" style="margin:0 0 4px">📝 Stock enviado por → '+(quien.length?esc(quien.join(' · ')):'sin informe de stock')+'</p>'; t+='📝 Stock enviado por: '+(quien.length?quien.join(' · '):'sin informe')+'\n';
+    // Super Popi
+    const popi=dt.filter(x=>x.tipo==='popi'), comp=dt.filter(x=>x.tipo==='compra');
+    h+='<h3 style="margin:8px 0 4px">⭐ Super Popi</h3>'; t+='\n⭐ SUPER POPI\n';
+    if(!popi.length){ h+='<p class="hint">No canjearon premio.</p>'; t+='• No canjearon premio\n'; }
+    else{ const g={}; popi.forEach(r=>{ const k=(r.turno||'')+' · '+(r.nombre||'?'); (g[k]=g[k]||[]).push(r); });
+      Object.keys(g).forEach(k=>{ const it=g[k].map(r=>r.qty+' '+r.prod).join(', '); const cp=comp.filter(c=>((c.turno||'')+' · '+(c.nombre||'?'))===k); const ct=cp.length?' — compró: '+cp.map(c=>c.qty+' '+c.prod).join(', '):' — no compró';
+        h+='<div style="margin:2px 0"><b>'+esc(k)+'</b>: canjeó '+esc(it)+'<span class="hint">'+esc(ct)+'</span></div>'; t+='• '+k+': canjeó '+it+ct+'\n'; }); }
+    // Merma
+    const me=dt.filter(x=>x.tipo==='merma');
+    h+='<h3 style="margin:10px 0 4px">🗑️ Merma</h3>'; t+='\n🗑️ MERMA\n';
+    if(!me.length){ h+='<p class="hint">Sin merma.</p>'; t+='• Sin merma\n'; }
+    else{ h+='<table>'+me.map(r=>{ const mot=r.n||'sin motivo'; t+='• '+r.prod+' ('+(SEC[r.sec]||r.sec)+'): '+r.qty+' — '+mot+' ('+(r.turno||'')+')\n'; return '<tr><td>'+esc(r.prod)+' <span class="hint">'+esc(SEC[r.sec]||r.sec)+'</span></td><td class="q m">'+r.qty+'</td><td>'+esc(mot)+'<div class="hint">'+esc((r.turno||'')+' · '+(r.nombre||''))+'</div></td></tr>'; }).join('')+'</table>'; }
+    // Glovo
+    h+='<h3 style="margin:10px 0 4px">🛵 Glovo</h3>'; t+='\n🛵 GLOVO\n';
+    const conG=gl.filter(x=>x.total||x.pedidos||x.detalle||x.img);
+    if(!conG.length){ h+='<p class="hint">Sin registro de Glovo.</p>'; t+='• Sin registro de Glovo\n'; }
+    else conG.sort((a,b)=>a.ts-b.ts).forEach(x=>{ const l1=[x.total?String(x.total).replace('.',',')+' €':'', x.pedidos?x.pedidos+' pedidos':''].filter(Boolean).join(' · ');
+      h+='<div style="margin:4px 0;padding:6px;background:#F3FBF9;border-radius:8px;"><b>'+esc(x.turno)+'</b> · enviado por <b>'+esc(x.nombre||'?')+'</b>'+(l1?'<div>'+esc(l1)+'</div>':'')+(x.detalle?'<div class="hint">'+esc(x.detalle)+'</div>':'')+(x.img?'<img data-p="'+esc(x.img)+'" style="display:none;max-width:100%;border-radius:8px;margin-top:6px;">':'')+'</div>';
+      t+='• '+x.turno+' ('+(x.nombre||'?')+'): '+(l1||'—')+(x.detalle?' — '+x.detalle:'')+(x.img?' [foto adjunta en el panel]':'')+'\n'; });
+    // Reposición (aprende del historial)
+    if(!tsel||tsel==='T'){
+      h+='<h3 style="margin:10px 0 4px">📦 Por favor enviar para mañana</h3>'; t+='\n📦 POR FAVOR ENVIAR PARA MAÑANA\n';
+      if(sM&&sT){
+        const M=mapa(sM), E=mapa(sT);
+        // historial: días anteriores con informe de mañana y tarde
+        const hist={}; let dias=0; const fechas=[...new Set(stocks.filter(x=>x.local===l&&x.fecha<dia).map(x=>x.fecha))].sort().slice(-14);
+        fechas.forEach(f=>{ const a=stocks.filter(x=>x.local===l&&x.fecha===f); const m1=a.filter(x=>esM(x.turno)).slice(-1)[0], t1=a.filter(x=>esT(x.turno)).slice(-1)[0]; if(!m1||!t1) return; dias++;
+          const Mm=mapa(m1), Ee=mapa(t1); Object.keys(Mm).forEach(k=>{ if(!(Mm[k]>0)) return; const e=Ee[k]||0; (hist[k]=hist[k]||[]).push(e===0?1:(Mm[k]-e)/Mm[k]); }); });
+        const usaH=dias>=3; const lis=[];
+        Object.keys(M).forEach(k=>{ if(!(M[k]>0)) return; const e=E[k]||0; const hoy=e===0?1:(M[k]-e)/M[k]; const hs=hist[k]||[]; const hm=hs.length>=3?hs.reduce((a,b)=>a+b,0)/hs.length:null;
+          const score=(usaH&&hm!==null)?(hoy+hm)/2:hoy; let p=tierDe(score); if(e===0) p=Math.max(p,30);
+          if(p) lis.push({k,p,M:M[k],e,hm,n:hs.length,ag:e===0}); });
+        lis.sort((a,b)=>b.p-a.p);
+        const nota=usaH?('Aprendiendo de los últimos '+dias+' días con informe de mañana y tarde.'):('Todavía aprendiendo ('+dias+' de 3 días necesarios): por ahora estimo solo con lo de hoy.');
+        if(!lis.length){ h+='<p class="hint">Nada se agotó rápido. No hace falta pedir de más.</p>'; t+='• Nada se agotó rápido\n'; }
+        else{ h+='<table>'+lis.map(r=>{ const a=r.k.split('|'); const hx=r.hm!==null?' · promedio '+r.n+' días: '+Math.round(r.hm*100)+'% de la mañana':''; t+='• '+a[1]+' ('+(SEC[a[0]]||a[0])+'): enviar +'+r.p+'%'+(r.ag?' — se agotó':'')+' (mañana '+r.M+' → noche '+r.e+(r.hm!==null?'; promedio '+r.n+' días '+Math.round(r.hm*100)+'%':'')+')\n'; return '<tr><td>'+esc(a[1])+' <span class="hint">'+esc(SEC[a[0]]||a[0])+'</span></td><td class="q" style="color:var(--red);font-weight:800">+'+r.p+'%</td><td><span class="hint">'+(r.ag?'se agotó':'salió rápido')+' · mañana '+r.M+' → noche '+r.e+esc(hx)+'</span></td></tr>'; }).join('')+'</table>'; }
+        h+='<p class="hint">'+esc(nota)+'</p>'; t+='('+nota+')\n';
+      } else { const f=(!sM?'mañana':'noche'); h+='<p class="hint">Falta el informe de '+f+' de este local para estimar.</p>'; t+='• Falta el informe de '+f+' para estimar\n'; }
+    }
+    // Incidencias (texto libre)
+    const ik=dia+'|'+l; let iv=''; try{ iv=localStorage.getItem('inc|'+ik)||''; }catch(e){}
+    const incApp=gl.filter(x=>x.incidencias).sort((a,b)=>a.ts-b.ts);
+    h+='<h3 style="margin:10px 0 4px">⚠️ Incidencias</h3>'; t+='\n⚠️ INCIDENCIAS\n';
+    incApp.forEach(x=>{ h+='<div style="margin:3px 0;padding:6px;background:#FFF6E5;border-radius:8px;"><b>'+esc(x.turno)+' · '+esc(x.nombre||'?')+'</b>: '+esc(x.incidencias)+'</div>'; t+='• '+x.turno+' ('+(x.nombre||'?')+'): '+x.incidencias+'\n'; });
+    h+='<textarea data-inc="'+esc(ik)+'" rows="3" placeholder="Escribí acá lo que quieras agregar al informe..." style="width:100%;box-sizing:border-box;padding:10px;border:1.5px solid #E5DCCB;border-radius:10px;font-size:15px;margin-top:4px;">'+esc(iv)+'</textarea>';
+    if(iv) t+='• '+iv+'\n'; if(!incApp.length&&!iv) t+='• Sin incidencias\n';
+    h+='</div>'; html+=h; text+=t;
+  });
+  if(!alguno){ html='<p class="hint">No hay datos para ese día.</p>'; text+='\nSin datos.'; }
+  else html+='<p class="hint">El % de reposición es una estimación. Se calcula con cuánto bajó cada sabor entre el informe de la mañana y el de la noche (y con el promedio de los días anteriores cuando ya hay al menos 3). Si se agotó, nunca baja de +30%.</p>';
+  return {html,text};
+}
+
 function TL(t,l){ return t==='merma'?'MERMA':(t==='compra'?'COMPRÓ':(l?'SUPER POPI':'POPI')); }
 function render(){ try{ estad(); }catch(e){ console.error(e); }
   const modo=$('modo').value; $('wD').style.display=modo==='dia'?'':'none'; $('wM').style.display=modo==='mes'?'':'none';
@@ -149,15 +255,15 @@ function render(){ try{ estad(); }catch(e){ console.error(e); }
   $('porProd').innerHTML=pk.length?tabla(pk.map(k=>{const a=k.split('|');return '<tr><td><span class="'+(a[0]==='merma'?'m':(a[0]==='compra'?'ok':'p'))+'">'+TL(a[0])+'</span> '+esc(a[1])+' <span class="hint">('+esc(a[2])+')</span></td><td class="q">'+pp[k]+'</td></tr>';}),['Producto','Cant.']):'<p class="hint">Nada para mostrar.</p>';
   // detalle
   const det=f.slice().sort((a,b)=>a.fecha<b.fecha?-1:a.fecha>b.fecha?1:(a.local<b.local?-1:1));
-  $('detalle').innerHTML=det.length?tabla(det.map(r=>'<tr><td>'+fb(r.fecha).slice(0,5)+'</td><td>'+esc(r.local)+'</td><td>'+esc(r.nombre)+'<div class="hint">'+esc(r.turno)+'</div></td><td><span class="'+(r.tipo==='merma'?'m':(r.tipo==='compra'?'ok':'p'))+'">'+TL(r.tipo)+'</span> '+esc(r.prod)+(r.tipo==='popi'?(r.c?' <span class="ok">· compró algo</span>':' <span class="hint">· no compró</span>'):'')+'</td><td class="q">'+r.qty+'</td></tr>'),['Fecha','Sucursal','Empleado','Producto','Cant.']):'<p class="hint">Nada para mostrar.</p>';
+  $('detalle').innerHTML=det.length?tabla(det.map(r=>'<tr><td>'+fb(r.fecha).slice(0,5)+'</td><td>'+esc(r.local)+'</td><td>'+esc(r.nombre)+'<div class="hint">'+esc(r.turno)+'</div></td><td><span class="'+(r.tipo==='merma'?'m':(r.tipo==='compra'?'ok':'p'))+'">'+TL(r.tipo)+'</span> '+esc(r.prod)+(r.tipo==='popi'?(r.c?' <span class="ok">· compró algo</span>':' <span class="hint">· no compró</span>'):'')+(r.n?'<div class="hint">Motivo: '+esc(r.n)+'</div>':'')+'</td><td class="q">'+r.qty+'</td></tr>'),['Fecha','Sucursal','Empleado','Producto','Cant.']):'<p class="hint">Nada para mostrar.</p>';
 }
 ['modo','dia','mes','suc','tipo'].forEach(i=>$(i).addEventListener('change',render));
 function texto(){ return filtrado().sort((a,b)=>a.fecha<b.fecha?-1:1).map(r=>fb(r.fecha)+' · '+r.local+' · '+r.nombre+' ('+r.turno+') · '+TL(r.tipo,1)+': '+r.qty+' '+r.prod+' ('+(SEC[r.sec]||r.sec)+')').join('\n'); }
 async function copiar(){ try{ await navigator.clipboard.writeText(texto()); $('msg2').textContent='Copiado.'; }catch(e){ prompt('Copiá:',texto()); } }
 function csv(){
   const q=v=>'"'+String(v).replace(/"/g,'""')+'"';
-  let c='﻿Fecha;Sucursal;Empleado;Turno;Tipo;Seccion;Producto;Cantidad\n';
-  filtrado().forEach(r=>{ c+=[fb(r.fecha),r.local,r.nombre,r.turno,(r.tipo==='merma'?'Merma':(r.tipo==='compra'?'Compró':'Super Popi')),SEC[r.sec]||r.sec,r.prod,r.qty].map(q).join(';')+'\n'; });
+  let c='﻿Fecha;Sucursal;Empleado;Turno;Tipo;Seccion;Producto;Cantidad;Motivo\n';
+  filtrado().forEach(r=>{ c+=[fb(r.fecha),r.local,r.nombre,r.turno,(r.tipo==='merma'?'Merma':(r.tipo==='compra'?'Compró':'Super Popi')),SEC[r.sec]||r.sec,r.prod,r.qty,r.n||''].map(q).join(';')+'\n'; });
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([c],{type:'text/csv;charset=utf-8'})); a.download='registro_sucursales.csv'; a.click();
 }
 function borrarTodo(){ if(confirm('¿Borrar todo lo cargado en este panel? No se puede deshacer.')){ datos=[]; stocks=[]; guardar(); render(); $('msg').textContent='Borrado.'; } }
