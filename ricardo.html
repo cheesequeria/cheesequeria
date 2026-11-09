@@ -91,7 +91,7 @@ function cargar(txtIn, silent){
         const key=[o.local,o.fecha,o.turno,o.nombre,r.id].join('|');
         if(have.has(key)){ repetidos++; return; }
         have.add(key); nuevos++;
-        datos.push({key,local:o.local,fecha:o.fecha,turno:o.turno,nombre:o.nombre,tipo:r.tipo,sec:r.sec,prod:r.prod,qty:r.qty,c:r.c?1:0,n:r.n||''});
+        datos.push({key,local:o.local,fecha:o.fecha,turno:o.turno,nombre:o.nombre,tipo:r.tipo,sec:r.sec,prod:r.prod,qty:r.qty,c:r.c?1:0,n:r.n||'',foto:r.f||''});
       });
     }catch(e){ malos++; }
   }
@@ -155,6 +155,7 @@ async function mailEnviar(dia, suc, tsel, msg){
     for(const m of mails){
       try{
         const adj=[]; for(const x of glov.filter(g=>g.local===m.l&&g.fecha===dia&&g.img&&(!tsel||(tsel==='M'?/ma[ñn]ana/i:/tarde|noche/i).test(g.turno||'')))){ try{ const u=await ghBlob(x.img); const b=await (await fetch(u)).blob(); adj.push({nombre:'glovo-'+m.l+'-'+(x.turno||'')+'.jpg',tipo:'image/jpeg',b64:await b64Blob(b)}); }catch(e){} }
+        const vf=new Set(); for(const d of datos.filter(d=>d.local===m.l&&d.fecha===dia&&d.tipo==='merma'&&d.foto&&(!tsel||(tsel==='M'?/ma[ñn]ana/i:/tarde|noche/i).test(d.turno||'')))){ if(vf.has(d.foto)) continue; vf.add(d.foto); try{ const u=await ghBlob(d.foto); const b=await (await fetch(u)).blob(); adj.push({nombre:'merma-'+m.l+'-'+d.prod+'.jpg',tipo:'image/jpeg',b64:await b64Blob(b)}); }catch(e){} }
         const r=await fetch(c.mail,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({key:c.mailKey||'',asunto:m.asunto,texto:m.texto,adj})});
         const j=await r.json(); res.push(j.ok?'✔ '+m.l+' enviado':'✘ '+m.l+': '+(j.error||'error'));
       }catch(e){ res.push('? '+m.l+': no pude confirmar el envío (revisá la bandeja de enviados)'); }
@@ -213,7 +214,7 @@ function informeGen(dia, suc, tsel){
     const me=dt.filter(x=>x.tipo==='merma');
     h+='<h3 style="margin:10px 0 4px">🗑️ Merma</h3>'; t+='\n🗑️ MERMA\n';
     if(!me.length){ h+='<p class="hint">Sin merma.</p>'; t+='• Sin merma\n'; }
-    else{ h+='<table>'+me.map(r=>{ const mot=r.n||'sin motivo'; t+='• '+r.prod+' ('+(SEC[r.sec]||r.sec)+'): '+r.qty+' — '+mot+' (informado turno '+(r.turno||'')+')'+(r.rep&&r.rep.length?' [ya informado, repetido en '+r.rep.join(', ')+']':'')+(r.pos?' [posible repetido, también en '+r.pos+']':'')+'\n'; return '<tr><td>'+esc(r.prod)+' <span class="hint">'+esc(SEC[r.sec]||r.sec)+'</span></td><td class="q m">'+r.qty+'</td><td>'+esc(mot)+'<div>'+chipT(r.turno)+' <span class="hint">'+esc(r.nombre||'')+'</span>'+chipRep(r)+'</div></td></tr>'; }).join('')+'</table>'; }
+    else{ h+='<table>'+me.map(r=>{ const mot=r.n||'sin motivo'; t+='• '+r.prod+' ('+(SEC[r.sec]||r.sec)+'): '+r.qty+' — '+mot+' (informado turno '+(r.turno||'')+')'+(r.rep&&r.rep.length?' [ya informado, repetido en '+r.rep.join(', ')+']':'')+(r.pos?' [posible repetido, también en '+r.pos+']':'')+(r.foto?' [foto adjunta]':'')+'\n'; return '<tr><td>'+esc(r.prod)+' <span class="hint">'+esc(SEC[r.sec]||r.sec)+'</span></td><td class="q m">'+r.qty+'</td><td>'+esc(mot)+'<div>'+chipT(r.turno)+' <span class="hint">'+esc(r.nombre||'')+'</span>'+chipRep(r)+(r.foto?'<img data-p="'+esc(r.foto)+'" style="display:none;max-width:100%;border-radius:8px;margin-top:6px;">':'')+'</div></td></tr>'; }).join('')+'</table>'; }
     // Glovo
     h+='<h3 style="margin:10px 0 4px">🛵 Glovo</h3>'; t+='\n🛵 GLOVO\n';
     const conG=gl.filter(x=>x.total||x.pedidos||x.detalle||x.img);

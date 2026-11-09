@@ -173,7 +173,7 @@
 <header class="top">
   <div class="header-top-row">
     <img class="app-logo" id="appLogo" alt="Cheesequeria">
-    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v10 · informe</span></h1>
+    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v11 · foto merma</span></h1>
   </div>
   <div class="meta-grid">
     <div class="meta-field" id="localField"><label>Local</label>
@@ -1284,7 +1284,7 @@ function chipRep(r){ let s=''; if(r.rep&&r.rep.length) s+=' <span style="display
     const me=dt.filter(x=>x.tipo==='merma');
     h+='<h3 style="margin:10px 0 4px">🗑️ Merma</h3>'; t+='\n🗑️ MERMA\n';
     if(!me.length){ h+='<p class="hint">Sin merma.</p>'; t+='• Sin merma\n'; }
-    else{ h+='<table>'+me.map(r=>{ const mot=r.n||'sin motivo'; t+='• '+r.prod+' ('+(SEC[r.sec]||r.sec)+'): '+r.qty+' — '+mot+' (informado turno '+(r.turno||'')+')'+(r.rep&&r.rep.length?' [ya informado, repetido en '+r.rep.join(', ')+']':'')+(r.pos?' [posible repetido, también en '+r.pos+']':'')+'\n'; return '<tr><td>'+esc(r.prod)+' <span class="hint">'+esc(SEC[r.sec]||r.sec)+'</span></td><td class="q m">'+r.qty+'</td><td>'+esc(mot)+'<div>'+chipT(r.turno)+' <span class="hint">'+esc(r.nombre||'')+'</span>'+chipRep(r)+'</div></td></tr>'; }).join('')+'</table>'; }
+    else{ h+='<table>'+me.map(r=>{ const mot=r.n||'sin motivo'; t+='• '+r.prod+' ('+(SEC[r.sec]||r.sec)+'): '+r.qty+' — '+mot+' (informado turno '+(r.turno||'')+')'+(r.rep&&r.rep.length?' [ya informado, repetido en '+r.rep.join(', ')+']':'')+(r.pos?' [posible repetido, también en '+r.pos+']':'')+(r.foto?' [foto adjunta]':'')+'\n'; return '<tr><td>'+esc(r.prod)+' <span class="hint">'+esc(SEC[r.sec]||r.sec)+'</span></td><td class="q m">'+r.qty+'</td><td>'+esc(mot)+'<div>'+chipT(r.turno)+' <span class="hint">'+esc(r.nombre||'')+'</span>'+chipRep(r)+(r.foto?'<img data-p="'+esc(r.foto)+'" style="display:none;max-width:100%;border-radius:8px;margin-top:6px;">':'')+'</div></td></tr>'; }).join('')+'</table>'; }
     // Glovo
     h+='<h3 style="margin:10px 0 4px">🛵 Glovo</h3>'; t+='\n🛵 GLOVO\n';
     const conG=gl.filter(x=>x.total||x.pedidos||x.detalle||x.img);
@@ -1353,7 +1353,7 @@ function chipRep(r){ let s=''; if(r.rep&&r.rep.length) s+=' <span style="display
           const key=[me.local,me.fecha,me.turno,me.persona].join('|'); stocks=stocks.filter(z=>z.key!==key);
           stocks.push({key,local:me.local,fecha:me.fecha,turno:me.turno,persona:me.persona,items}); }
         if(o.reg){ const g=o.reg; (g.recs||[]).forEach(r=>{ const key=[g.local,g.fecha,g.turno,g.nombre,r.id].join('|'); if(datos.some(d=>d.key===key)) return;
-          datos.push({key,local:g.local,fecha:g.fecha,turno:g.turno,nombre:g.nombre,tipo:r.tipo,sec:r.sec,prod:r.prod,qty:r.qty,c:r.c?1:0,n:r.n||''}); }); }
+          datos.push({key,local:g.local,fecha:g.fecha,turno:g.turno,nombre:g.nombre,tipo:r.tipo,sec:r.sec,prod:r.prod,qty:r.qty,c:r.c?1:0,n:r.n||'',foto:r.f||''}); }); }
       }catch(e){} })); }
     }
     try{ const ls=(await lista(cfg,'glovo/'+cur)).filter(x=>x.name.endsWith('.json')&&x.name.includes(marca));
@@ -1369,6 +1369,8 @@ function chipRep(r){ let s=''; if(r.rep&&r.rep.length) s+=' <span style="display
       try{
         const cfg=nubeCfg(); const adj=[];
         for(const x of glov.filter(g=>g.local===local&&g.fecha===dia&&g.img&&(!tsel||(tsel==='M'?/ma[ñn]ana/i:/tarde|noche/i).test(g.turno||'')))){ try{ const r=await fetch(apiB(cfg)+x.img,{headers:hdr(cfg,true)}); adj.push({nombre:'glovo-'+local+'-'+(x.turno||'')+'.jpg',tipo:'image/jpeg',b64:await b64Blob(await r.blob())}); }catch(e){} }
+        const fo=datos.filter(d=>d.local===local&&d.fecha===dia&&d.tipo==='merma'&&d.foto&&(!tsel||(tsel==='M'?/ma[ñn]ana/i:/tarde|noche/i).test(d.turno||''))); const vf=new Set();
+        for(const d of fo){ if(vf.has(d.foto)) continue; vf.add(d.foto); try{ const r=await fetch(apiB(cfg)+d.foto,{headers:hdr(cfg,true)}); adj.push({nombre:'merma-'+local+'-'+d.prod+'.jpg',tipo:'image/jpeg',b64:await b64Blob(await r.blob())}); }catch(e){} }
         const r=await fetch(c.mail,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({key:c.mailKey||'',asunto,texto,adj})});
         const j=await r.json(); msg.textContent=j.ok?'✔ Informe enviado por mail':'No se pudo enviar: '+(j.error||'error');
       }catch(e){ msg.textContent='No pude confirmar el envío. Revisá con Maxi si llegó el mail.'; }
@@ -2448,6 +2450,7 @@ function abrirMerma(bucket, tipo){
     + ((multi||bucket==='otros') ? '<div style="display:flex;gap:6px;margin:6px 0;"><input id="mmOtro" placeholder="Otro producto (escribir)" style="flex:1;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;"><button id="mmOtroB" type="button" style="padding:0 16px;border:0;border-radius:10px;background:#2B241D;color:#fff;font-weight:800;">Agregar</button></div>' : '')
     + (esMerma ? '' : '<div style="margin:10px 0 6px;padding:10px;border:1.5px dashed '+color+';border-radius:12px;"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><b style="flex:1;min-width:130px;">🛒 ¿Compró algo?</b><button type="button" id="mmCNo" style="padding:10px 18px;border:0;border-radius:10px;font-size:15px;font-weight:800;background:#2B241D;color:#fff;">No</button><button type="button" id="mmCSi" style="padding:10px 18px;border:0;border-radius:10px;font-size:15px;font-weight:800;background:#ddd;color:#2B241D;">Sí</button></div><div id="mmCBox" style="display:none;margin-top:8px;"><p class="hint" style="margin:0 0 6px;">Tocá <b>+</b> en lo que <b>compró</b> (pagó).</p><div id="mmCLista"></div><div style="display:flex;gap:6px;margin:6px 0 0;"><input id="mmCOtro" placeholder="Otro producto comprado (escribir)" style="flex:1;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;"><button id="mmCOtroB" type="button" style="padding:0 16px;border:0;border-radius:10px;background:#2B241D;color:#fff;font-weight:800;">+</button></div></div></div>')
     + (esMerma ? '<div style="margin:8px 0 2px;font-weight:800;">Motivo de la merma</div><div id="mmMot" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;">'+['Vencida','Se cayó','Rota / dañada','Mal estado','Error de preparación','Otro'].map(m=>'<button type="button" class="mm-mot" data-m="'+m+'" style="padding:10px 12px;border:1.5px solid #B23A2E;border-radius:20px;background:#fff;color:#B23A2E;font-size:14px;font-weight:700;">'+m+'</button>').join('')+'</div>' : '')
+    + (esMerma ? '<div style="margin:6px 0 2px;"><label style="font-weight:800;">📷 Foto de la merma (opcional)</label><input id="mmImg" type="file" accept="image/*" style="width:100%;margin-top:4px;"><img id="mmPrev" style="display:none;max-width:100%;border-radius:10px;margin-top:6px;"></div>' : '')
     + '<input id="mmNota" placeholder="'+(esMerma?'Detalle (opcional)':'Nota (opcional)')+'" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;margin:6px 0 10px;box-sizing:border-box;">'
     + '<div style="display:flex;gap:8px;"><button id="mmCancel" style="flex:1;padding:14px;border:0;border-radius:12px;background:#ddd;font-size:16px;font-weight:700;">Cancelar</button><button id="mmSave" style="flex:2;padding:14px;border:0;border-radius:12px;background:'+color+';color:#fff;font-size:16px;font-weight:800;">Guardar '+(esMerma?'merma':'Super Popi')+'</button></div>';
   ov.appendChild(box); document.body.appendChild(ov);
@@ -2508,6 +2511,9 @@ function abrirMerma(bucket, tipo){
   }
   let motivo = '';
   box.querySelectorAll('.mm-mot').forEach(b=>{ b.onclick=()=>{ motivo=(motivo===b.dataset.m)?'':b.dataset.m; box.querySelectorAll('.mm-mot').forEach(x=>{ const on=x.dataset.m===motivo; x.style.background=on?'#B23A2E':'#fff'; x.style.color=on?'#fff':'#B23A2E'; }); }; });
+  let mmFoto=null;
+  const mi=box.querySelector('#mmImg');
+  if(mi) mi.onchange=async e=>{ const f=e.target.files[0]; if(!f){ mmFoto=null; return; } try{ mmFoto=await comprimirImagen(f,1000,0.65); const p=box.querySelector('#mmPrev'); p.src=mmFoto; p.style.display='block'; }catch(x){ alert('No se pudo leer la foto.'); } };
   box.querySelector('#mmCancel').onclick = ()=>ov.remove();
   box.querySelector('#mmSave').onclick = ()=>{
     const fecha = box.querySelector('#mmFecha').value || hoyISO();
@@ -2521,7 +2527,12 @@ function abrirMerma(bucket, tipo){
     const local = document.getElementById('metaLocal').value;
     const turno = document.getElementById('metaTurno').value;
     const persona = (document.getElementById('metaPersona').value||'').trim();
-    const nuevos = items.map(k=>{ const b=k.split('|')[0], sab=lbl(k); return {id:Date.now()+'_'+Math.random().toString(36).slice(2,6), tipo, fecha, local, turno, bucket:b, sabor:sab, qty:qty[k], unidad:/2x1/i.test(sab)?'2x1':MERMA_SECCIONES[b].unidad, nota, persona, compro:(!esMerma&&compras.length)?1:0}; });
+    let fotoPath='';
+    if(esMerma && mmFoto && nubeCfg()){
+      fotoPath='merma/'+fecha.slice(0,7)+'/'+fecha+'__'+slug(local)+'__'+slug(turno)+'__'+slug(persona)+'__'+Date.now()+'.jpg';
+      const cola=colaLeer(); cola.push({path:fotoPath,b64:mmFoto.split(',')[1]}); colaGuardar(cola); vaciarCola(false);
+    }
+    const nuevos = items.map(k=>{ const b=k.split('|')[0], sab=lbl(k); return {foto:fotoPath, id:Date.now()+'_'+Math.random().toString(36).slice(2,6), tipo, fecha, local, turno, bucket:b, sabor:sab, qty:qty[k], unidad:/2x1/i.test(sab)?'2x1':MERMA_SECCIONES[b].unidad, nota, persona, compro:(!esMerma&&compras.length)?1:0}; });
     compras.forEach(c=>nuevos.push({id:Date.now()+'_'+Math.random().toString(36).slice(2,6), tipo:'compra', fecha, local, turno, bucket:c.b, sabor:c.sab, qty:cq[c.key], unidad:MERMA_SECCIONES[c.b].unidad, nota:'', persona, compro:0}));
     mermaGuardar(mermaLeer().concat(nuevos));
     ov.remove();
@@ -2677,7 +2688,7 @@ function regCodigo(){
   const l = mermaLeer().filter(m=>m.fecha===f && (m.persona||'').trim().toLowerCase()===nom.toLowerCase() && (m.turno||t)===t);
   if(!l.length) return '';
   const o = {v:1, local:document.getElementById('metaLocal').value, fecha:f, turno:t, nombre:nom,
-    recs:l.map(m=>({id:m.id,tipo:tipoDe(m),sec:m.bucket,prod:m.sabor,qty:m.qty,c:m.compro?1:0,n:(m.nota||'')}))};
+    recs:l.map(m=>({id:m.id,tipo:tipoDe(m),sec:m.bucket,prod:m.sabor,qty:m.qty,c:m.compro?1:0,n:(m.nota||''),f:(m.foto||'')}))};
   return 'REG1:'+btoa(unescape(encodeURIComponent(JSON.stringify(o))));
 }
 
