@@ -42,6 +42,16 @@ table{width:100%;border-collapse:collapse;font-size:13.5px;} th,td{border-bottom
   </div>
  </div>
 
+ <div class="card" id="cardResumen"><h2>🧭 Resumen para dueños</h2>
+  <div class="row">
+   <div><label>Período</label><select id="rsModo"><option value="1">Un día</option><option value="7">Últimos 7 días</option></select></div>
+   <div><label>Hasta el día</label><input type="date" id="rsDia"></div>
+   <div style="align-self:end"><button onclick="rsCargar()">🔄 Ver resumen</button></div>
+  </div>
+  <div id="rsEstado" class="hint" style="margin-top:6px"></div>
+  <div id="rsOut"></div>
+ </div>
+
  <div class="card"><h2>Quién mandó cierre</h2><div id="estado" class="grid"></div></div>
  <div class="card"><h2>📊 Estadísticas</h2><div id="estad"></div></div>
  <div class="card"><h2>Stock del día por sucursal</h2><div id="stockDia"></div></div>
@@ -422,6 +432,95 @@ async function nube(manual){
   nubeBusy=false;
 }
 ['modo','dia','mes'].forEach(i=>$(i).addEventListener('change',()=>nube()));
+// ---------- Resumen para dueños ----------
+(function(){
+  const rsd=document.getElementById('rsDia'); if(rsd) rsd.value=hoy;
+  const isM=t=>/ma[ñn]ana/i.test(t||''), isT=t=>/tarde|noche/i.test(t||'');
+  const addD=(iso,n)=>{ const d=new Date(iso+'T12:00:00'); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate()); };
+  const num=v=>{ const x=parseFloat(String(v==null?'':v).replace(',','.')); return isFinite(x)?x:0; };
+  window.rsCargar=async function(){
+    const est=$('rsEstado'); const n=+$('rsModo').value, hasta=$('rsDia').value||hoy, desde=addD(hasta,-(n-1));
+    est.textContent='Cargando datos de '+SUCS.length+' sucursales...';
+    try{
+      const meses=[...new Set([desde.slice(0,7),hasta.slice(0,7)])]; let nuevos=0;
+      for(const mm of meses){
+        const lista=await ghGet('contents/cierres/'+mm,false)||[];
+        const nombres=lista.filter(x=>x.name.endsWith('.json')&&x.name.slice(0,10)>=desde&&x.name.slice(0,10)<=hasta).map(x=>x.name).filter(nm=>!cache.has(mm+'/'+nm));
+        for(let i=0;i<nombres.length;i+=6){ await Promise.all(nombres.slice(i,i+6).map(async nm=>{ try{ const o=JSON.parse(await ghGet('contents/cierres/'+mm+'/'+nm,true)); let s=''; if(o.stock) s+='STOCK1:'+btoa(unescape(encodeURIComponent(JSON.stringify(o.stock))))+'\n'; if(o.reg) s+='REG1:'+btoa(unescape(encodeURIComponent(JSON.stringify(o.reg))))+'\n'; cargar(s,true); cache.add(mm+'/'+nm); nuevos++; }catch(e){} })); }
+        try{ const lg=await ghGet('contents/glovo/'+mm,false)||[];
+          const gn=lg.filter(x=>x.name.endsWith('.json')&&x.name.slice(0,10)>=desde&&x.name.slice(0,10)<=hasta).map(x=>x.name).filter(nm=>!glovCache.has(nm));
+          await Promise.all(gn.map(async nm=>{ try{ const o=JSON.parse(await ghGet('contents/glovo/'+mm+'/'+nm,true)); o._n=nm; glov.push(o); glovCache.add(nm); }catch(e){} })); }catch(e){}
+      }
+      try{ marcarRep(); }catch(e){}
+      est.textContent='Actualizado '+new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+      $('rsOut').innerHTML=rsGen(desde,hasta);
+    }catch(e){ est.textContent='No se pudo cargar ('+e.message+')'; }
+  };
+  const top=(obj,k)=>Object.entries(obj).sort((a,b)=>b[1]-a[1]).slice(0,k);
+  const chip=(t,c)=>'<span style="display:inline-block;padding:1px 7px;border-radius:9px;font-size:11.5px;font-weight:800;background:'+c[0]+';color:'+c[1]+';margin:1px 2px 1px 0">'+t+'</span>';
+  const OK=['#E3F3E8','#2E7D4F'], BAD=['#FBE3E0','#B23A2E'], GR=['#EEE8DC','#6B6258'], WARN=['#FFF1D6','#9A6A00'];
+  function rsGen(desde,hasta){
+    const dias=[]; for(let d=desde;d<=hasta;d=addD(d,1)) dias.push(d);
+    const unDia=desde===hasta; const inR=f=>f>=desde&&f<=hasta;
+    const S=stocks.filter(x=>inR(x.fecha)&&SUCS.includes(x.local)), D=datos.filter(x=>inR(x.fecha)&&SUCS.includes(x.local)), G=glov.filter(x=>inR(x.fecha)&&SUCS.includes(x.local));
+    const R={}; SUCS.forEach(l=>{ R[l]={l,mer:0,merL:[],mp:{},mot:{},popi:0,popL:{},comp:0,glT:0,glP:0,glN:0,inc:[],agot:[],fM:0,fT:0,diasOk:0,faltan:[]}; });
+    D.forEach(r=>{ const o=R[r.local]; if(!o) return; if(r.tipo==='merma'){ o.mer+=r.qty; o.mp[r.prod]=(o.mp[r.prod]||0)+r.qty; const m=(r.n||'sin motivo').split('·')[0].trim()||'sin motivo'; o.mot[m]=(o.mot[m]||0)+r.qty; o.merL.push(r); } else if(r.tipo==='popi'){ o.popi+=r.qty; o.popL[r.prod]=(o.popL[r.prod]||0)+r.qty; } else if(r.tipo==='compra'){ o.comp+=r.qty; } });
+    G.forEach(g=>{ const o=R[g.local]; if(!o) return; o.glT+=num(g.total); o.glP+=num(g.pedidos); o.glN++; if(g.incidencias) o.inc.push((g.turno||'')+' · '+(g.nombre||'?')+': '+g.incidencias); });
+    // fichas y agotados por día
+    SUCS.forEach(l=>{ const o=R[l]; dias.forEach(d=>{ const a=S.filter(x=>x.local===l&&x.fecha===d); const m=a.filter(x=>isM(x.turno)).slice(-1)[0], t=a.filter(x=>isT(x.turno)).slice(-1)[0]; if(m) o.fM++; if(t) o.fT++; if(m&&t) o.diasOk++;
+        if(d<hoy){ if(!m) o.faltan.push(fb(d).slice(0,5)+' mañana'); if(!t) o.faltan.push(fb(d).slice(0,5)+' noche'); }
+        if(m&&t){ const mp={}; m.items.forEach(i=>{ mp[i.sec+'|'+i.prod]=i.qty; }); const tp={}; t.items.forEach(i=>{ tp[i.sec+'|'+i.prod]=i.qty; });
+          Object.keys(mp).forEach(k=>{ if(mp[k]>0&&!(tp[k]>0)) o.agot.push(k.split('|')[1]); }); } }); });
+    const act=SUCS.filter(l=>R[l].fM+R[l].fT>0||R[l].mer||R[l].popi||R[l].glN);
+    const L=[]; // lo más llamativo
+    // 1 fichas faltantes
+    const sinF=SUCS.filter(l=>R[l].faltan.length); const sinNada=SUCS.filter(l=>!(R[l].fM+R[l].fT));
+    if(unDia&&hasta<hoy&&sinF.length){ const par=sinF.filter(l=>R[l].fM+R[l].fT>0); if(sinNada.length) L.push(['🚨','Sin ninguna ficha: <b>'+sinNada.map(esc).join(', ')+'</b>',1]); if(par.length) L.push(['🚨','Ficha incompleta: '+par.map(l=>'<b>'+esc(l)+'</b> (falta '+R[l].faltan.map(x=>esc(x.split(' ')[1])).join(' y ')+')').join(' · '),1]); }
+    else if(!unDia&&sinNada.length) L.push(['🚨','Sin ninguna ficha en el período: <b>'+sinNada.map(esc).join(', ')+'</b>',1]);
+    else if(!unDia&&sinF.length) L.push(['⚠️','Fichas que faltan: '+sinF.map(l=>'<b>'+esc(l)+'</b> ('+R[l].faltan.length+')').join(' · '),0]);
+    // 2 merma
+    const tm=SUCS.reduce((a,l)=>a+R[l].mer,0); const conM=SUCS.filter(l=>R[l].mer>0); const prom=conM.length?tm/conM.length:0;
+    const altos=conM.filter(l=>R[l].mer>=5&&R[l].mer>=1.5*prom).sort((a,b)=>R[b].mer-R[a].mer);
+    const allMp={}; SUCS.forEach(l=>Object.entries(R[l].mp).forEach(([p,q])=>allMp[p]=(allMp[p]||0)+q)); const allMot={}; SUCS.forEach(l=>Object.entries(R[l].mot).forEach(([p,q])=>allMot[p]=(allMot[p]||0)+q));
+    if(tm) L.push(['🗑️','Merma total: <b>'+tm+' u</b>'+(top(allMp,3).length?' · más: '+top(allMp,3).map(a=>esc(a[0])+' ('+a[1]+')').join(', '):'')+(top(allMot,1).length?' · motivo principal: <i>'+esc(top(allMot,1)[0][0])+'</i>':''),0]); else L.push(['🗑️','Sin merma registrada en el período.',0]);
+    altos.forEach(l=>L.push(['🚨','Merma alta en <b>'+esc(l)+'</b>: '+R[l].mer+' u (promedio de la red '+prom.toFixed(1)+') — sobre todo '+top(R[l].mp,2).map(a=>esc(a[0])+' ('+a[1]+')').join(', '),1]));
+    // 3 agotados
+    const ag={}; SUCS.forEach(l=>[...new Set(R[l].agot)].forEach(p=>{ (ag[p]=ag[p]||[]).push(l); }));
+    const agL=Object.entries(ag).sort((a,b)=>b[1].length-a[1].length);
+    if(agL.length) L.push(['📦','Se agotó entre la mañana y la noche: '+agL.slice(0,6).map(a=>'<b>'+esc(a[0])+'</b> ('+a[1].length+' local'+(a[1].length>1?'es':'')+')').join(' · '),0]);
+    // 4 popi
+    const tp=SUCS.reduce((a,l)=>a+R[l].popi,0), tc=SUCS.reduce((a,l)=>a+R[l].comp,0); const allP={}; SUCS.forEach(l=>Object.entries(R[l].popL).forEach(([p,q])=>allP[p]=(allP[p]||0)+q));
+    L.push(['⭐',tp?('Super Popi: <b>'+tp+' canje'+(tp>1?'s':'')+'</b> · el más pedido: '+esc(top(allP,1)[0][0])+' · compraron algo en '+tc+(tc!==1?' veces':' vez')):'Sin canjes de Super Popi.',0]);
+    // 5 glovo
+    const glT=SUCS.reduce((a,l)=>a+R[l].glT,0), glP=SUCS.reduce((a,l)=>a+R[l].glP,0); const gl=SUCS.filter(l=>R[l].glT>0).sort((a,b)=>R[b].glT-R[a].glT);
+    L.push(['🛵',glT?('Glovo: <b>'+glT.toFixed(2).replace('.',',')+' €</b>'+(glP?' · '+glP+' pedidos':'')+' · mejor: '+esc(gl[0])+' ('+R[gl[0]].glT.toFixed(2).replace('.',',')+' €)'):'Sin ventas de Glovo cargadas.',0]);
+    // 6 incidencias
+    const incs=[]; SUCS.forEach(l=>R[l].inc.forEach(t=>incs.push([l,t])));
+    if(incs.length) L.push(['⚠️','<b>'+incs.length+' incidencia'+(incs.length>1?'s':'')+'</b>:<br>'+incs.slice(0,8).map(a=>'• <b>'+esc(a[0])+'</b> — '+esc(a[1])).join('<br>'),1]);
+    let h='<div style="margin-top:10px;border:1.5px solid #E5DCCB;border-radius:12px;padding:10px;"><b>Lo más llamativo · '+(unDia?fb(hasta):fb(desde)+' → '+fb(hasta))+'</b>'+L.map(x=>'<div style="margin:6px 0;padding:7px 9px;border-radius:9px;background:'+(x[2]?'#FBE3E0':'#F6F1E7')+';">'+x[0]+' '+x[1]+'</div>').join('')+'</div>';
+    // tabla por sucursal
+    h+='<h2 style="margin-top:14px">Tienda por tienda</h2><div style="overflow-x:auto"><table><tr><th>Local</th><th>Fichas</th><th>Merma</th><th>Popi</th><th>Glovo €</th><th>Incid.</th><th>Alertas</th></tr>';
+    const orden=SUCS.slice().sort((a,b)=>{ const sc=l=>(R[l].faltan.length?2:0)+(altos.includes(l)?2:0)+(R[l].inc.length?1:0); return sc(b)-sc(a)||a.localeCompare(b); });
+    orden.forEach(l=>{ const o=R[l]; const fl=[]; if(o.faltan.length&&hasta<hoy) fl.push(chip('faltan fichas',BAD)); if(altos.includes(l)) fl.push(chip('merma alta',BAD)); if(o.inc.length) fl.push(chip('incidencia',WARN)); if(!(o.fM+o.fT)) fl.push(chip('sin datos',GR));
+      const fi=unDia?(chip('M '+(o.fM?'✓':'—'),o.fM?OK:(hasta<hoy?BAD:GR))+chip('T '+(o.fT?'✓':'—'),o.fT?OK:(hasta<hoy?BAD:GR))):(o.diasOk+'/'+dias.length+' días');
+      h+='<tr><td><b>'+esc(l)+'</b></td><td>'+fi+'</td><td>'+(o.mer?('<span class="m">'+o.mer+'</span>'):'0')+'</td><td>'+(o.popi||0)+'</td><td>'+(o.glT?o.glT.toFixed(2).replace('.',','):'—')+'</td><td>'+(o.inc.length||'')+'</td><td>'+(fl.join('')||chip('ok',OK))+'</td></tr>'; });
+    h+='</table></div>';
+    // detalle por tienda
+    h+='<h2 style="margin-top:14px">Detalle de cada tienda</h2>';
+    orden.forEach(l=>{ const o=R[l]; if(!(o.fM+o.fT||o.mer||o.popi||o.glN)) return;
+      let x='';
+      x+='<div>🗑️ <b>Merma:</b> '+(o.mer?top(o.mp,5).map(a=>esc(a[0])+' '+a[1]).join(', ')+' — motivos: '+top(o.mot,3).map(a=>esc(a[0])+' ('+a[1]+')').join(', '):'sin merma')+'</div>';
+      x+='<div>⭐ <b>Super Popi:</b> '+(o.popi?top(o.popL,5).map(a=>esc(a[0])+' '+a[1]).join(', ')+(o.comp?' · compraron '+o.comp:''):'sin canjes')+'</div>';
+      x+='<div>🛵 <b>Glovo:</b> '+(o.glN?o.glT.toFixed(2).replace('.',',')+' €'+(o.glP?' · '+o.glP+' pedidos':''):'sin registro')+'</div>';
+      x+='<div>📦 <b>Se agotó:</b> '+(o.agot.length?[...new Set(o.agot)].slice(0,10).map(esc).join(', '):'nada')+'</div>';
+      if(o.inc.length) x+='<div>⚠️ <b>Incidencias:</b><br>'+o.inc.map(t=>'• '+esc(t)).join('<br>')+'</div>';
+      if(o.faltan.length&&hasta<hoy) x+='<div class="m">Faltan fichas: '+o.faltan.map(esc).join(', ')+'</div>';
+      h+='<details style="margin:6px 0;border:1.5px solid #E5DCCB;border-radius:10px;padding:8px 10px;"><summary style="font-weight:800;cursor:pointer">'+esc(l)+' <span class="hint">· merma '+o.mer+' · popi '+o.popi+(o.glT?' · glovo '+o.glT.toFixed(0)+' €':'')+'</span></summary><div style="margin-top:6px;line-height:1.6">'+x+'</div></details>'; });
+    return h;
+  }
+  window.rsGen=rsGen;
+})();
+
 setInterval(()=>{ if(!document.hidden) nube(); }, 60000);
 
 // clave (la elige Ricardo la primera vez; se guarda cifrada en el repo de datos)
