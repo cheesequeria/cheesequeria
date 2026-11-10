@@ -173,7 +173,7 @@
 <header class="top">
   <div class="header-top-row">
     <img class="app-logo" id="appLogo" alt="Cheesequeria">
-    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v22 · oreo/kitkat</span></h1>
+    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v23 · solo F y M</span></h1>
   </div>
   <div class="meta-grid">
     <div class="meta-field" id="localField"><label>Local</label>
@@ -205,8 +205,8 @@
       <button class="bigbtn" style="background:#00A082;color:#fff;" onclick="abrirGlovo()">🛵 Glovo e incidencias del turno</button>
       <p class="hint" style="margin-top:6px;">Cargá lo facturado por Glovo (a mano o con foto) y cualquier incidencia del turno. Le llega a Ricardo y a Maxi.</p>
       <button class="bigbtn" style="margin-top:12px;background:#2B241D;color:#fff;" onclick="INF.abrir()">📄 Informe del día · enviar por mail</button>
-      <button class="bigbtn" style="margin-top:8px;background:#1F5FA8;color:#fff;" onclick="FRQ.abrir()">📋 Abrir formulario de la franquicia (stock ya cargado)</button>
-      <p class="hint" style="margin-top:6px;">Se abre el formulario de la franquicia con el stock que tenés cargado. Revisalo y apretá Enviar. Lo que no tiene casillero en su formulario va a "OTROS".</p>
+      <div id="frqBox"><button class="bigbtn" style="margin-top:8px;background:#1F5FA8;color:#fff;" onclick="FRQ.abrir()">📋 Abrir formulario de la franquicia (stock ya cargado)</button>
+      <p class="hint" style="margin-top:6px;">Se abre el formulario de la franquicia con el stock que tenés cargado. Revisalo y apretá Enviar. Lo que no tiene casillero en su formulario va a "OTROS".</p></div>
       <p class="hint" style="margin-top:6px;">Al terminar el turno, mandá primero la ficha de stock y después este informe. Sale por mail a Ricardo, Francisco y Noelia.</p>
     </div>
     <div class="card">
@@ -1513,7 +1513,7 @@ function chipRep(r){ let s=''; if(r.rep&&r.rep.length) s+=' <span style="display
   }
   return {abrir};
 })();
-window.addEventListener('load', function(){ aplicarTemaLocal(); var ml=document.getElementById('metaLocal'); if(ml) ml.addEventListener('change', aplicarTemaLocal); setTimeout(function(){ vaciarCola(false); }, 1500); });
+window.addEventListener('load', function(){ aplicarTemaLocal(); (function(){ var l=(document.getElementById('metaLocal')||{}).value; var b=document.getElementById('frqBox'); if(b) b.style.display=(l==='Fuengirola'||l==='Miramar')?'':'none'; })(); var ml=document.getElementById('metaLocal'); if(ml) ml.addEventListener('change', aplicarTemaLocal); setTimeout(function(){ vaciarCola(false); }, 1500); });
 
 // ---------------------------------------------------------------
 // CÓDIGO PARA COPIAR/PEGAR (transferir el stock entre dispositivos
