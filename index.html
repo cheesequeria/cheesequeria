@@ -173,7 +173,7 @@
 <header class="top">
   <div class="header-top-row">
     <img class="app-logo" id="appLogo" alt="Cheesequeria">
-    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v20 · formulario franquicia</span></h1>
+    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v22 · oreo/kitkat</span></h1>
   </div>
   <div class="meta-grid">
     <div class="meta-field" id="localField"><label>Local</label>
@@ -1257,7 +1257,11 @@ const FRQ=(function(){
     const usados={porcion:new Set(),cookie:new Set(),tarrina:new Set(),tartaPeq:new Set(),tartaMini:new Set()};
     // porciones y tartas enteras
     let oP=0,oT=0;
-    P.forEach(a=>{ usados.porcion.add(a[0]); const r=(stockRaw.porcion||{})[a[0]]||{porc:0,tarta:0}; set(a[1],r.porc||0); set(a[2],r.tarta||0); });
+    const EXTRAS={'Filipinos':[['Chips Ahoy','Chips Ahoy'],['Oreo','Oreo blanco']],'Milka Oreo':[['Kit Kat','Kit Kat']]};
+    Object.keys(EXTRAS).forEach(k=>EXTRAS[k].forEach(e=>usados.porcion.add(e[0])));
+    P.forEach(a=>{ usados.porcion.add(a[0]); const r=(stockRaw.porcion||{})[a[0]]||{porc:0,tarta:0}; let pc=r.porc||0, ta=r.tarta||0; const np=[], nt=[];
+      (EXTRAS[a[0]]||[]).forEach(e=>{ const x=(stockRaw.porcion||{})[e[0]]||{}; if((x.porc||0)>0){ pc+=x.porc; np.push(x.porc+' son '+e[1]); } if((x.tarta||0)>0){ ta+=x.tarta; nt.push(x.tarta+' son '+e[1]); } });
+      if(pc>0) out[a[1]]=String(pc)+(np.length?' ('+np.join(', ')+')':''); if(ta>0) out[a[2]]=String(ta)+(nt.length?' ('+nt.join(', ')+')':''); });
     Object.keys(stockRaw.porcion||{}).forEach(f=>{ if(usados.porcion.has(f)) return; const r=stockRaw.porcion[f]||{}; oP+=(r.porc||0); oT+=(r.tarta||0); });
     const simple=(sec,lista,otros)=>{ let o=0; lista.forEach(a=>{ usados[sec].add(a[0]); set(a[1],(stock[sec]||{})[a[0]]||0); }); Object.keys(stock[sec]||{}).forEach(f=>{ if(!usados[sec].has(f)) o+=(stock[sec][f]||0); }); return o; };
     let oC=simple('cookie',C), oTa=simple('tarrina',T), oQ=simple('tartaPeq',Q), oM=simple('tartaMini',M);
