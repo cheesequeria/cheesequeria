@@ -173,7 +173,7 @@
 <header class="top">
   <div class="header-top-row">
     <img class="app-logo" id="appLogo" alt="Cheesequeria">
-    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v17 · fotos pdf</span></h1>
+    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v19 · borrar popi</span></h1>
   </div>
   <div class="meta-grid">
     <div class="meta-field" id="localField"><label>Local</label>
@@ -1279,8 +1279,12 @@ function chipRep(r){ let s=''; if(r.rep&&r.rep.length) s+=' <span style="display
     if(!popi.length){ h+='<p class="hint">No canjearon premio.</p>'; t+='• No canjearon premio\n'; }
     else{ const g={}; popi.forEach(r=>{ const k=(r.turno||'')+' · '+(r.nombre||'?'); (g[k]=g[k]||[]).push(r); });
       Object.keys(g).forEach(k=>{ const it=g[k].map(r=>r.qty+' '+r.prod).join(', '); const cp=comp.filter(c=>((c.turno||'')+' · '+(c.nombre||'?'))===k); const ct=cp.length?' — compró: '+cp.map(c=>c.qty+' '+c.prod).join(', '):' — no compró';
-        const rp=g[k].map(chipRep).join(''); const tx=g[k].map(r=>(r.rep&&r.rep.length?' [ya informado en '+r.turno+', repetido en '+r.rep.join(', ')+']':'')+(r.pos?' [posible repetido, también en '+r.pos+']':'')).join('');
-        h+='<div style="margin:2px 0">'+chipT(g[k][0].turno)+' <b>'+esc(g[k][0].nombre||'?')+'</b>: canjeó '+esc(it)+'<span class="hint">'+esc(ct)+'</span>'+rp+'</div>'; t+='• '+k+': canjeó '+it+ct+tx+'\n'; }); }
+        const rp=g[k].map(chipRep).join(''); const tx=(g[k].some(r=>r.foto||r.fotoData)?' [foto adjunta]':'')+g[k].map(r=>(r.rep&&r.rep.length?' [ya informado en '+r.turno+', repetido en '+r.rep.join(', ')+']':'')+(r.pos?' [posible repetido, también en '+r.pos+']':'')).join('');
+        const fp=[]; g[k].forEach(r=>{ const u=r.fotoData?('D'+r.fotoData):(r.foto?('P'+r.foto):''); if(u&&!fp.includes(u)) fp.push(u); });
+          const ph=fp.map(u=>u[0]==='D'?'<img src="'+u.slice(1)+'" style="max-width:100%;border-radius:8px;margin-top:6px;display:block;">':'<img data-p="'+esc(u.slice(1))+'" style="display:none;max-width:100%;border-radius:8px;margin-top:6px;">').join('');
+          const px=g[k].map(r=>datos.indexOf(r)).join(',');
+          const cam='<button data-px="'+px+'" style="float:right;margin-left:4px;border:0;background:#eee;border-radius:8px;padding:4px 10px;font-size:16px;font-weight:800;color:#B23A2E;">✕</button><label style="float:right;margin-left:4px;background:#eee;border-radius:8px;padding:4px 9px;font-size:16px;">📷<input type="file" accept="image/*" data-mf="'+datos.indexOf(g[k][0])+'" style="display:none"></label>';
+          h+='<div style="margin:2px 0">'+cam+chipT(g[k][0].turno)+' <b>'+esc(g[k][0].nombre||'?')+'</b>: canjeó '+esc(it)+'<span class="hint">'+esc(ct)+'</span>'+rp+ph+'</div>'; t+='• '+k+': canjeó '+it+ct+tx+'\n'; }); }
     // Merma
     const me=dt.filter(x=>x.tipo==='merma');
     h+='<h3 style="margin:10px 0 4px">🗑️ Merma</h3>'; t+='\n🗑️ MERMA\n';
@@ -1375,8 +1379,8 @@ function chipRep(r){ let s=''; if(r.rep&&r.rep.length) s+=' <span style="display
       try{
         const cfg=nubeCfg(); const adj=[];
         for(const x of glov.filter(g=>g.local===local&&g.fecha===dia&&g.img&&(!tsel||(tsel==='M'?/ma[ñn]ana/i:/tarde|noche/i).test(g.turno||'')))){ try{ const r=await fetch(apiB(cfg)+x.img,{headers:hdr(cfg,true)}); adj.push({nombre:'glovo-'+local+'-'+(x.turno||'')+'.jpg',tipo:'image/jpeg',b64:await b64Blob(await r.blob())}); }catch(e){} }
-        const fo=datos.filter(d=>d.local===local&&d.fecha===dia&&d.tipo==='merma'&&(d.foto||d.fotoData)&&(!tsel||(tsel==='M'?/ma[ñn]ana/i:/tarde|noche/i).test(d.turno||''))); const vf=new Set();
-        for(const d of fo){ if(d.fotoData){ adj.push({nombre:'merma-'+local+'-'+d.prod+'.jpg',tipo:'image/jpeg',b64:d.fotoData.split(',')[1]}); continue; } if(vf.has(d.foto)) continue; vf.add(d.foto); try{ const r=await fetch(apiB(cfg)+d.foto,{headers:hdr(cfg,true)}); adj.push({nombre:'merma-'+local+'-'+d.prod+'.jpg',tipo:'image/jpeg',b64:await b64Blob(await r.blob())}); }catch(e){} }
+        const fo=datos.filter(d=>d.local===local&&d.fecha===dia&&(d.tipo==='merma'||d.tipo==='popi')&&(d.foto||d.fotoData)&&(!tsel||(tsel==='M'?/ma[ñn]ana/i:/tarde|noche/i).test(d.turno||''))); const vf=new Set();
+        for(const d of fo){ if(d.fotoData){ adj.push({nombre:(d.tipo==='popi'?'popi-':'merma-')+local+'-'+d.prod+'.jpg',tipo:'image/jpeg',b64:d.fotoData.split(',')[1]}); continue; } if(vf.has(d.foto)) continue; vf.add(d.foto); try{ const r=await fetch(apiB(cfg)+d.foto,{headers:hdr(cfg,true)}); adj.push({nombre:'merma-'+local+'-'+d.prod+'.jpg',tipo:'image/jpeg',b64:await b64Blob(await r.blob())}); }catch(e){} }
         const r=await fetch(c.mail,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({key:c.mailKey||'',asunto,texto,adj})});
         const j=await r.json(); msg.textContent=j.ok?'✔ Informe enviado por mail':'No se pudo enviar: '+(j.error||'error');
       }catch(e){ msg.textContent='No pude confirmar el envío. Revisá con Maxi si llegó el mail.'; }
@@ -1388,7 +1392,7 @@ function chipRep(r){ let s=''; if(r.rep&&r.rep.length) s+=' <span style="display
   async function fotosInforme(local,dia,tsel){
     const okT=t=>!tsel||(tsel==='M'?/ma[ñn]ana/i:/tarde|noche/i).test(t||''); const out=[]; const cfg=nubeCfg();
     const bajar=async p=>{ const r=await fetch(apiB(cfg)+p,{headers:hdr(cfg,true)}); const b=await r.blob(); return await new Promise((ok,ko)=>{ const f=new FileReader(); f.onload=()=>ok('data:image/jpeg;base64,'+String(f.result).split(',')[1]); f.onerror=ko; f.readAsDataURL(b); }); };
-    for(const d of datos.filter(d=>d.local===local&&d.fecha===dia&&d.tipo==='merma'&&(d.foto||d.fotoData)&&okT(d.turno))){ try{ out.push({t:'Merma: '+d.prod,u:d.fotoData||await bajar(d.foto)}); }catch(e){} }
+    for(const d of datos.filter(d=>d.local===local&&d.fecha===dia&&(d.tipo==='merma'||d.tipo==='popi')&&(d.foto||d.fotoData)&&okT(d.turno)&&!(d.foto&&out.some(z=>z.k===d.foto)))){ try{ out.push({k:d.foto,t:(d.tipo==='popi'?'Super Popi: ':'Merma: ')+d.prod,u:d.fotoData||await bajar(d.foto)}); }catch(e){} }
     for(const g of glov.filter(g=>g.local===local&&g.fecha===dia&&g.img&&okT(g.turno))){ try{ out.push({t:'Glovo · '+(g.turno||''),u:await bajar(g.img)}); }catch(e){} }
     return out;
   }
@@ -1454,6 +1458,7 @@ function chipRep(r){ let s=''; if(r.rep&&r.rep.length) s+=' <span style="display
       $('iC').querySelectorAll('button[data-ovx]').forEach(b=>{ b.onclick=()=>{ OVR[b.dataset.ovx]=null; gen(); }; });
       $('iC').querySelectorAll('button[data-ovr]').forEach(b=>{ b.onclick=()=>{ Object.keys(OVR).forEach(k=>{ if(OVR[k]===null) delete OVR[k]; }); gen(); }; });
       $('iC').querySelectorAll('input[data-mf]').forEach(i=>{ i.onchange=async e=>{ const f=e.target.files[0]; const d=datos[+i.dataset.mf]; if(!f||!d) return; try{ const du=await comprimirImagen(f,1000,0.65); d.fotoData=du; const cfg=nubeCfg(); if(cfg){ const p='merma/'+d.fecha.slice(0,7)+'/'+d.fecha+'__'+slug(d.local)+'__'+slug(d.turno)+'__'+slug(d.nombre)+'__'+Date.now()+'.jpg'; const cola=colaLeer(); cola.push({path:p,b64:du.split(',')[1]}); colaGuardar(cola); vaciarCola(false); } gen(); }catch(x){ alert('No se pudo leer la foto.'); } }; });
+      $('iC').querySelectorAll('button[data-px]').forEach(b=>{ b.onclick=()=>{ if(!confirm('¿Sacar este Super Popi del informe? (no se borra de la nube, solo no sale en este mail)')) return; const ix=b.dataset.px.split(',').map(Number).sort((a,c)=>c-a); ix.forEach(i=>datos.splice(i,1)); gen(); }; });
       $('iC').querySelectorAll('button[data-mx]').forEach(b=>{ b.onclick=()=>{ if(!confirm('¿Sacar esta merma del informe? (no se borra de la nube, solo no sale en este mail)')) return; datos.splice(+b.dataset.mx,1); gen(); }; });
       $('iC').querySelectorAll('button[data-gx]').forEach(b=>{ b.onclick=async()=>{ const x=glov[+b.dataset.gx]; if(!x||!confirm('¿Borrar este registro de Glovo definitivamente? (también desaparece del panel de Ricardo)')) return; b.disabled=true; try{ await borrarGlovo(x); glov.splice(+b.dataset.gx,1); gen(); }catch(e){ alert('No se pudo borrar ('+e.message+').'); b.disabled=false; } }; });
       $('iC').querySelectorAll('textarea[data-inc]').forEach(t=>{ t.oninput=()=>{ try{ localStorage.setItem('inc|'+t.dataset.inc,t.value); }catch(e){} }; }); };
@@ -2521,7 +2526,7 @@ function abrirMerma(bucket, tipo){
     + ((multi||bucket==='otros') ? '<div style="display:flex;gap:6px;margin:6px 0;"><input id="mmOtro" placeholder="Otro producto (escribir)" style="flex:1;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;"><button id="mmOtroB" type="button" style="padding:0 16px;border:0;border-radius:10px;background:#2B241D;color:#fff;font-weight:800;">Agregar</button></div>' : '')
     + (esMerma ? '' : '<div style="margin:10px 0 6px;padding:10px;border:1.5px dashed '+color+';border-radius:12px;"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><b style="flex:1;min-width:130px;">🛒 ¿Compró algo?</b><button type="button" id="mmCNo" style="padding:10px 18px;border:0;border-radius:10px;font-size:15px;font-weight:800;background:#2B241D;color:#fff;">No</button><button type="button" id="mmCSi" style="padding:10px 18px;border:0;border-radius:10px;font-size:15px;font-weight:800;background:#ddd;color:#2B241D;">Sí</button></div><div id="mmCBox" style="display:none;margin-top:8px;"><p class="hint" style="margin:0 0 6px;">Tocá <b>+</b> en lo que <b>compró</b> (pagó).</p><div id="mmCLista"></div><div style="display:flex;gap:6px;margin:6px 0 0;"><input id="mmCOtro" placeholder="Otro producto comprado (escribir)" style="flex:1;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;"><button id="mmCOtroB" type="button" style="padding:0 16px;border:0;border-radius:10px;background:#2B241D;color:#fff;font-weight:800;">+</button></div></div></div>')
     + (esMerma ? '<div style="margin:8px 0 2px;font-weight:800;">Motivo de la merma</div><div id="mmMot" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px;">'+['Vencida','Se cayó','Rota / dañada','Mal estado','Error de preparación','Otro'].map(m=>'<button type="button" class="mm-mot" data-m="'+m+'" style="padding:10px 12px;border:1.5px solid #B23A2E;border-radius:20px;background:#fff;color:#B23A2E;font-size:14px;font-weight:700;">'+m+'</button>').join('')+'</div>' : '')
-    + (esMerma ? '<div style="margin:6px 0 2px;"><label style="font-weight:800;">📷 Foto de la merma (opcional)</label><input id="mmImg" type="file" accept="image/*" style="width:100%;margin-top:4px;"><img id="mmPrev" style="display:none;max-width:100%;border-radius:10px;margin-top:6px;"></div>' : '')
+    + (true ? '<div style="margin:6px 0 2px;"><label style="font-weight:800;">📷 Foto (opcional)</label><input id="mmImg" type="file" accept="image/*" style="width:100%;margin-top:4px;"><img id="mmPrev" style="display:none;max-width:100%;border-radius:10px;margin-top:6px;"></div>' : '')
     + '<input id="mmNota" placeholder="'+(esMerma?'Detalle (opcional)':'Nota (opcional)')+'" style="width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;margin:6px 0 10px;box-sizing:border-box;">'
     + '<div style="display:flex;gap:8px;"><button id="mmCancel" style="flex:1;padding:14px;border:0;border-radius:12px;background:#ddd;font-size:16px;font-weight:700;">Cancelar</button><button id="mmSave" style="flex:2;padding:14px;border:0;border-radius:12px;background:'+color+';color:#fff;font-size:16px;font-weight:800;">Guardar '+(esMerma?'merma':'Super Popi')+'</button></div>';
   ov.appendChild(box); document.body.appendChild(ov);
@@ -2599,7 +2604,7 @@ function abrirMerma(bucket, tipo){
     const turno = document.getElementById('metaTurno').value;
     const persona = (document.getElementById('metaPersona').value||'').trim();
     let fotoPath='';
-    if(esMerma && mmFoto && nubeCfg()){
+    if(mmFoto && nubeCfg()){
       fotoPath='merma/'+fecha.slice(0,7)+'/'+fecha+'__'+slug(local)+'__'+slug(turno)+'__'+slug(persona)+'__'+Date.now()+'.jpg';
       const cola=colaLeer(); cola.push({path:fotoPath,b64:mmFoto.split(',')[1]}); colaGuardar(cola); vaciarCola(false);
     }
@@ -2633,13 +2638,15 @@ function mermaPintarRojo(){
         row.style.background = '#FBE3E0';
         const tag = document.createElement('div'); tag.className='mm-tag';
         tag.style.cssText='color:#B23A2E;font-weight:800;font-size:12.5px;width:100%;';
-        tag.textContent = '🗑️ Merma hoy: '+nm+' '+MERMA_SECCIONES[b].unidad;
+        tag.textContent = '🗑️ Merma hoy: '+nm+' '+MERMA_SECCIONES[b].unidad+'  ✕ tocá para borrar';
+        tag.style.cursor='pointer'; tag.onclick=()=>mermaQuitarHoy('merma',b,nombre);
         row.appendChild(tag);
       }
       if(np){
         const tag = document.createElement('div'); tag.className='mm-tag';
         tag.style.cssText='color:'+THEME_ORANGE+';font-weight:800;font-size:12.5px;width:100%;';
-        tag.textContent = '⭐ Super Popi hoy: '+np+' '+MERMA_SECCIONES[b].unidad;
+        tag.textContent = '⭐ Super Popi hoy: '+np+' '+MERMA_SECCIONES[b].unidad+'  ✕ tocá para borrar';
+        tag.style.cursor='pointer'; tag.onclick=()=>mermaQuitarHoy('popi',b,nombre);
         row.appendChild(tag);
       }
     });
@@ -2667,6 +2674,14 @@ function mermaRender(){
   Object.keys(tot).sort().forEach(k=>{ h += '<tr><td>'+escH(k)+'</td><td class="q">'+tot[k]+'</td></tr>'; });
   h += '</table>';
   wrap.innerHTML = h;
+}
+async function mermaQuitarHoy(tipo,b,sabor){
+  const hoy=hoyISO(); const del=mermaLeer().filter(m=>m.fecha===hoy&&tipoDe(m)===tipo&&m.bucket===b&&m.sabor===sabor);
+  if(!del.length) return;
+  const tot=del.reduce((a,m)=>a+m.qty,0);
+  if(!(await uiConfirm('¿Borrar '+(tipo==='popi'?'el Super Popi':'la merma')+' de '+sabor+' de hoy ('+tot+')?\nSi ya mandaste la ficha, volvé a mandarla y avisá para sacarlo del informe.','Sí, borrar'))) return;
+  const ids=new Set(del.map(m=>m.id)); mermaGuardar(mermaLeer().filter(m=>!ids.has(m.id)));
+  mermaRender(); mermaPintarRojo();
 }
 async function mermaBorrar(id){
   if(!(await uiConfirm('¿Borrar esta línea?','Sí, borrar'))) return;
