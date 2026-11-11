@@ -173,11 +173,11 @@
 <header class="top">
   <div class="header-top-row">
     <img class="app-logo" id="appLogo" alt="Cheesequeria">
-    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v24 · sin formulario</span></h1>
+    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v27 · F y M</span></h1>
   </div>
   <div class="meta-grid">
     <div class="meta-field" id="localField"><label>Local</label>
-      <select id="metaLocal"><option value="">— Elegí tu local —</option><option>Almería</option><option>Carretería</option><option>Fuengirola</option><option>Granada</option><option>Huelin</option><option>Marbella</option><option>Mayorazgo</option><option>Miramar</option><option>Nevada</option><option>Palo</option><option>Plaza Mayor</option><option>Teatinos</option><option>Vialia</option></select>
+      <select id="metaLocal"><option value="">— Elegí tu local —</option><option>Fuengirola</option><option>Miramar</option></select>
     </div>
     <div class="meta-field"><label>Turno</label>
       <select id="metaTurno"><option>Mañana</option><option>Tarde</option></select>
@@ -205,6 +205,8 @@
       <button class="bigbtn" style="background:#00A082;color:#fff;" onclick="abrirGlovo()">🛵 Glovo e incidencias del turno</button>
       <p class="hint" style="margin-top:6px;">Cargá lo facturado por Glovo (a mano o con foto) y cualquier incidencia del turno. Le llega a Ricardo y a Maxi.</p>
       <button class="bigbtn" style="margin-top:12px;background:#2B241D;color:#fff;" onclick="INF.abrir()">📄 Informe del día · enviar por mail</button>
+      <div id="frqBox"><button class="bigbtn" style="margin-top:8px;background:#1F5FA8;color:#fff;" onclick="FRQ.enviar()">📤 Enviar stock a la franquicia</button>
+      <p class="hint" style="margin-top:6px;">Manda tu stock cargado al sistema de la franquicia (listas). Lo de merma, Super Popi y Glovo no se manda.</p></div>
       <p class="hint" style="margin-top:6px;">Al terminar el turno, mandá primero la ficha de stock y después este informe. Sale por mail a Ricardo, Francisco y Noelia.</p>
     </div>
     <div class="card">
@@ -395,7 +397,7 @@ const COOKIES = ["Dos chocolates","Negra chocolate blanco","Lotus","Pistacho","K
 const TARTA_PEQ = ["Payoya","Filipino","Tradicional","Pistacho","Chocobom blanco","Chocobom leche","Pistacho Gluten Free","Payoyo Gluten Free","Tradicional Gluten Free","Milkibar Gluten Free","Loca","Pionono","Lacasitos"];
 const TARTA_MINI = ["Payoya","Filipino","Tradicional","Pistacho","Chocobom blanco","Chocobom leche","Pistacho Gluten Free","Payoyo Gluten Free","Tradicional Gluten Free","Milkibar Gluten Free","Loca","Pionono","Lacasitos"];
 
-const PANETON = ["Chocolate blanco","Kinder","Lotus","Tres chocolates"];
+const PANETON = ["Chocolate blanco","Kinder","Lotus","Tres chocolates","Pistacho"];
 const ROSCON = ["Tradicional","Tradicional con nata","Pistacho","Lotus","Chocolate con avellana"];
 const BUCKETS = ['porcion','tarrina','cookie','tartaPeq','tartaMini','paneton','panetonP','roscon','rosconP'];
 function newBuckets(){ const o={}; BUCKETS.forEach(b=>{ o[b]={}; }); return o; }
@@ -1239,13 +1241,80 @@ function abrirGlovo(){
   };
 }
 
+
+// ---------- Stock a la franquicia (su sistema de listas): lo manda esta app ----------
+const FRQ=(function(){
+  const API='https://script.google.com/macros/s/AKfycbxa-Dn0cmt6lL--nTGc7Ap6KsiUxLNvAW6moDdDeCgaQ7Mh1XTZaAZ9r-OAo1B_WsnWBg/exec';
+  const CLAVE={Fuengirola:'fuengirola',Miramar:'miramar'};
+  const N=s=>String(s).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim();
+  const G={
+   GRANDES:{sec:'porcion',g:[['TRADICIONAL + LEMON PIE + CARAPINO',['Tradicional','Lemon Pie','Carapino']],['PAYOYO',['Payoyo']],['IDIAZABAL',['Idiazábal']],['LA VIÑA',['De la viña']],['PISTACHO',['Pistacho']],['KINDER',['Kinder']],['FILIPINOS + OREO BLANCO + MILKYBAR + CHIPS AHOY',['Filipinos','Oreo','Milkybar','Chips Ahoy']],['LOTUS',['Lotus']],['MILKA OREO + KIT KAT',['Milka Oreo','Kit Kat']],['GALLETA LIMON',['Galleta limón']],['MANGO',['Mango']],['HAPPY HIPPO',['Happy Hippo']],['DULCE DE LECHE',['Dulce de leche']]]},
+   COOKIES:{sec:'cookie',g:[['DOS CHOCOLATES',['Dos chocolates']],['NEGRA CHOCOLATE BLANCO',['Negra chocolate blanco']],['LOTUS',['Lotus']],['PISTACHO',['Pistacho']],['KINDER',['Kinder']],['OREO',['Oreo']],['TWIX',['Twix']],['FILIPINOS',['Filipinos blancos']],['DUBAI',['Dubai']],['KIT KAT',['Kit kat']],['ZANAHORIA',['Zanahoria']],['RED VELVET',['Red velvet']],['CHOCOBOM',['Choco bom']]]},
+   TARRINAS:{sec:'tarrina',g:[['PISTACHO',['Pistacho']],['KINDER',['Kinder']],['CHOCOLATE BLANCO',['Choco Blanc']]]},
+   PEQUENAS:{sec:'tartaPeq',g:[['PISTACHO',['Pistacho']],['PAYOYO',['Payoya']],['TRADICIONAL',['Tradicional']],['FILIPINOS',['Filipino']],['CHOCOBOM BLANCO',['Chocobom blanco']],['CHOCOBOM LECHE',['Chocobom leche']],['LOCA',['Loca']],['PIONONO',['Pionono']]]},
+   MINIS:{sec:'tartaMini',g:[['PISTACHO',['Pistacho']],['PAYOYO',['Payoya']],['TRADICIONAL',['Tradicional']],['FILIPINOS',['Filipino']],['CHOCOBOM BLANCO',['Chocobom blanco']],['CHOCOBOM LECHE',['Chocobom leche']],['PISTACHO SIN GLUTEN',['Pistacho Gluten Free']],['PAYOYO SIN GLUTEN',['Payoyo Gluten Free']],['TRADICIONAL SIN GLUTEN',['Tradicional Gluten Free']],['MILKYBAR SIN GLUTEN',['Milkibar Gluten Free']],['LOCA',['Loca']],['PIONONO',['Pionono']]]}
+  };
+  const secDe=t=>{ const n=N(t); return n.includes('GRANDES')?'GRANDES':n.includes('COOKIES')?'COOKIES':n.includes('TARRINAS')?'TARRINAS':n.includes('PEQUE')?'PEQUENAS':n.includes('MINI')?'MINIS':null; };
+  // cantidades de la app: {nombre:{porc,tarta}} para porciones, {nombre:qty} para el resto
+  function cant(sec,nombre){
+    if(sec==='porcion'){ const r=(stockRaw.porcion||{})[nombre]||{porc:0,tarta:0}; return {p:r.porc||0,t:r.tarta||0}; }
+    return {p:((stock[sec]||{})[nombre])||0,t:0};
+  }
+  function construir(datos){
+    let max=-1; const idxs=[]; datos.secciones.forEach(sc=>sc.sabores.forEach(s=>['uds','porc','ent'].forEach(k=>{ if(s[k]!==undefined){ max=Math.max(max,s[k]); } })));
+    const vals=Array(max+1).fill(''); const resumen=[]; let llenos=0;
+    datos.secciones.forEach(sc=>{ const key=secDe(sc.titulo); if(!key) return; const def=G[key]; const sec=def.sec; const usados=new Set();
+      let tp=0,tt=0;
+      const put=(s,p,t)=>{ if(s.uds!==undefined){ if(p>0){ vals[s.uds]=p; llenos++; tp+=p; } } else { if(p>0){ vals[s.porc]=p; llenos++; tp+=p; } if(t>0){ vals[s.ent]=t; llenos++; tt+=t; } } };
+      let otros=null;
+      sc.sabores.forEach(s=>{ const nm=N(s.nombre); if(nm==='OTROS'){ otros=s; return; } if(nm==='TURRON') return;
+        const gdef=def.g.find(x=>N(x[0])===nm); if(!gdef) return; let p=0,t=0; gdef[1].forEach(it=>{ usados.add(it); const c=cant(sec,it); p+=c.p; t+=c.t; }); put(s,p,t); });
+      // lo que no tiene casillero propio va a OTROS
+      let op=0,ot=0; const todos=sec==='porcion'?Object.keys(stockRaw.porcion||{}):Object.keys(stock[sec]||{});
+      todos.forEach(it=>{ if(usados.has(it)) return; const c=cant(sec,it); op+=c.p; ot+=c.t; });
+      Object.keys(stockCustom).forEach(k=>{ if(k.split('_')[0]!==sec) return; const q=(stockCustom[k]&&stockCustom[k].qty)||0; if(q&&(customName[k]||'').trim()) op+=q; });
+      if(otros) put(otros,op,ot);
+      resumen.push(sc.titulo+': '+tp+(tt?(' porc. + '+tt+' tartas'):' uds')+(otros&&(op||ot)?(' (OTROS '+op+(ot?'+'+ot+'t':'')+')'):''));
+    });
+    return {vals,resumen,llenos};
+  }
+  async function enviar(){
+    const local=document.getElementById('metaLocal').value; const clave=CLAVE[local];
+    if(!clave){ alert('Para este local no hay lista de la franquicia.'); return; }
+    const quien=(document.getElementById('metaPersona').value||'').trim();
+    if(!quien){ alert('Poné tu nombre arriba (quién hace el recuento) y volvé a tocar.'); return; }
+    const old=document.getElementById('frqOv'); if(old) old.remove();
+    const ov=document.createElement('div'); ov.id='frqOv'; ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99998;overflow:auto;padding:10px;';
+    const bx=document.createElement('div'); bx.style.cssText='background:#fff;border-radius:14px;max-width:560px;margin:0 auto;padding:14px;';
+    bx.innerHTML='<h3 style="margin:0 0 8px">📤 Stock a la franquicia · '+local+'</h3><div id="fqC" class="hint">Cargando la lista de la franquicia...</div><div id="fqB" style="display:flex;gap:8px;margin-top:12px;"></div>';
+    ov.appendChild(bx); document.body.appendChild(ov);
+    const $=id=>bx.querySelector('#'+id); const cerrar=()=>ov.remove();
+    $('fqB').innerHTML='<button id="fqX" style="flex:1;padding:14px;border:0;border-radius:12px;background:#ddd;font-weight:800;">Cancelar</button>';
+    $('fqX').onclick=cerrar;
+    let datos;
+    try{ datos=await (await fetch(API+'?t='+encodeURIComponent(clave))).json(); if(datos.error) throw new Error(datos.error); }catch(e){ $('fqC').textContent='No se pudo cargar la lista de la franquicia ('+e.message+'). Revisá internet y probá de nuevo.'; return; }
+    const r=construir(datos);
+    $('fqC').innerHTML='<p style="margin:0 0 6px">Se enviará a la franquicia el stock que tenés cargado ahora, a nombre de <b>'+quien.replace(/[<>&]/g,'')+'</b>. Casilleros completados: <b>'+r.llenos+'</b>.</p><div class="hint" style="line-height:1.6">'+r.resumen.map(x=>x.replace(/[<>&]/g,'')).join('<br>')+'</div><p class="hint" style="margin-top:8px">Lo que está en cero va en blanco. Lo que no tiene casillero en su lista va a OTROS. Si te equivocás, volvé a enviarla: vale la última.</p>';
+    const b=document.createElement('button'); b.textContent='Enviar a la franquicia'; b.style.cssText='flex:2;padding:14px;border:0;border-radius:12px;background:#1F5FA8;color:#fff;font-size:16px;font-weight:800;'; $('fqB').appendChild(b);
+    b.onclick=async()=>{ b.disabled=true; b.textContent='Enviando...';
+      try{
+        let res=await (await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({t:clave,version:datos.version,quien,valores:r.vals})})).json();
+        if(res.recargar){ $('fqC').textContent=res.error||'La lista cambió. Cerrá y volvé a tocar el botón.'; b.remove(); return; }
+        if(!res.ok){ $('fqC').textContent=res.error||'No se pudo enviar. Probá de nuevo.'; b.disabled=false; b.textContent='Enviar a la franquicia'; return; }
+        $('fqC').innerHTML='<b style="color:#2E7D4F">✔ Lista enviada a la franquicia'+(res.etiqueta?(': '+String(res.etiqueta).replace(/[<>&]/g,'')):'')+'.</b>'; b.remove(); $('fqX').textContent='Cerrar';
+      }catch(e){ $('fqC').textContent='No se pudo confirmar el envío ('+e.message+'). Probá de nuevo.'; b.disabled=false; b.textContent='Enviar a la franquicia'; }
+    };
+  }
+  return {enviar,construir};
+})();
+
 // ---------- Informe del día: lo envía cada local por mail ----------
 const INF=(function(){
   const SEC={porcion:'Porciones',tarrina:'Tarrinas',cookie:'Cookies',tartaPeq:'Tarta Pequeña',tartaMini:'Tarta Mini',paneton:'Panetones',panetonP:'Panetones pequeños',roscon:'Roscones',rosconP:'Roscones pequeños',bebida:'Bebidas',otros:'Otros'};
   const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const fb=f=>{ const a=String(f).split('-'); return a[2]+'/'+a[1]+'/'+a[0]; };
   const SUCS=[]; let stocks=[], datos=[], glov=[], shaImg={}; const OVR={};
-  const MAIL_TO=['lacheesequeriafuengirola@gmail.com','franciscohusillos@grupoelcaserito.com','ricardoalvarez@grupoelcaserito.com','noeliafigueroa@grupoelcaserito.com'];
+  const MAIL_TO=['lacheesequeriafuengirola@gmail.com'];
   function marcarRep(){
   const esM=t=>/ma[ñn]ana/i.test(t||'');
   const g={}; datos.forEach(r=>{ const k=r.local+'|'+r.fecha+'|'+r.tipo+'|'+(String(r.key||'').split('|').pop()); (g[k]=g[k]||[]).push(r); });
@@ -1471,7 +1540,7 @@ function chipRep(r){ let s=''; if(r.rep&&r.rep.length) s+=' <span style="display
   }
   return {abrir};
 })();
-window.addEventListener('load', function(){ aplicarTemaLocal(); var ml=document.getElementById('metaLocal'); if(ml) ml.addEventListener('change', aplicarTemaLocal); setTimeout(function(){ vaciarCola(false); }, 1500); });
+window.addEventListener('load', function(){ aplicarTemaLocal(); (function(){ var l=(document.getElementById('metaLocal')||{}).value; var b=document.getElementById('frqBox'); if(b) b.style.display=(l==='Fuengirola'||l==='Miramar')?'':'none'; })(); var ml=document.getElementById('metaLocal'); if(ml) ml.addEventListener('change', aplicarTemaLocal); setTimeout(function(){ vaciarCola(false); }, 1500); });
 
 // ---------------------------------------------------------------
 // CÓDIGO PARA COPIAR/PEGAR (transferir el stock entre dispositivos
