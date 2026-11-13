@@ -173,7 +173,7 @@
 <header class="top">
   <div class="header-top-row">
     <img class="app-logo" id="appLogo" alt="Cheesequeria">
-    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v27 · F y M</span></h1>
+    <h1><span class="dot"></span> Cheesequeria — Stock Final <span class="store-badge" id="storeBadge"></span> <span style="font-size:11px;font-weight:700;opacity:.85;">v28 · informe completo</span></h1>
   </div>
   <div class="meta-grid">
     <div class="meta-field" id="localField"><label>Local</label>
@@ -1433,6 +1433,10 @@ function chipRep(r){ let s=''; if(r.rep&&r.rep.length) s+=' <span style="display
           datos.push({key,local:g.local,fecha:g.fecha,turno:g.turno,nombre:g.nombre,tipo:r.tipo,sec:r.sec,prod:r.prod,qty:r.qty,c:r.c?1:0,n:r.n||'',foto:r.f||''}); }); }
       }catch(e){} })); }
     }
+    // Lo cargado en ESTE dispositivo ese día (merma / Super Popi / compró), aunque nadie haya mandado la ficha o lo haya cargado otra persona
+    try{ const ids=new Set(datos.map(d=>String(d.key).split('|').pop())); const tdef=(document.getElementById('metaTurno')||{}).value||'';
+      (mermaLeer()||[]).filter(m=>m.fecha===dia).forEach(m=>{ if(ids.has(String(m.id))) return; const tur=m.turno||tdef; const nom=(m.persona||'').trim();
+        datos.push({key:[local,dia,tur,nom,m.id].join('|'),local:local,fecha:dia,turno:tur,nombre:nom,tipo:tipoDe(m),sec:m.bucket,prod:m.sabor,qty:m.qty,c:m.compro?1:0,n:m.nota||'',foto:m.foto||''}); }); }catch(e){}
     try{ const all=await lista(cfg,'glovo/'+cur); shaImg={}; all.forEach(z=>{ shaImg['glovo/'+cur+'/'+z.name]=z.sha; }); const ls=all.filter(x=>x.name.endsWith('.json')&&x.name.includes(marca));
       await Promise.all(ls.map(async x=>{ try{ const g0=JSON.parse(await crudo(cfg,'glovo/'+cur+'/'+x.name)); g0._p='glovo/'+cur+'/'+x.name; g0._sha=x.sha; if(!glov.some(z=>z._p===g0._p)) glov.push(g0); }catch(e){} })); }catch(e){}
   }
